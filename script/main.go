@@ -20,8 +20,7 @@ var testHTML string = `
 
 func main() {
 	//httpClient("https://www.google.com")
-	tokens := TokenizeHTML(testHTML)
-	for _, val := range tokens {
-		fmt.Println(val)
-	}
+	testToken := NewHTMLTokenizer(testHTML)
+	tokens := TokenizeHTML(testToken)
+	fmt.Println(tokens)
 }
