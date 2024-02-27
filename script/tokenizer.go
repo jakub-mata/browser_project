@@ -1,6 +1,9 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 type HTMLTokenizer struct {
 	input string
@@ -47,9 +50,10 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 	var returnState []int //a stack of return states, values are ints from enums State
 
 	for token.curr < len(token.input) {
+		currVal := token.input[token.curr]
 		switch state {
 		case Data:
-			switch token.input[token.curr] {
+			switch currVal {
 			case ampersand:
 				state = CharacterReference
 				returnState = append(returnState, int(Data))
@@ -59,7 +63,7 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 				// Parse error
 				emitToken(HTMLToken{
 					Type:    Character,
-					Content: string(token.input[token.curr]),
+					Content: string(currVal),
 				}, &tokens)
 			case endOfFile:
 				emitToken(HTMLToken{
@@ -68,13 +72,12 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 			default:
 				emitToken(HTMLToken{
 					Type:    Character,
-					Content: string(token.input[token.curr]),
+					Content: string(currVal),
 				}, &tokens)
 			}
-			token.curr++
 
 		case RCDATA:
-			switch token.input[token.curr] {
+			switch currVal {
 			case ampersand: //'&'
 				state = CharacterReference
 				returnState = append(returnState, int(RCDATA))
@@ -93,13 +96,12 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 			default:
 				emitToken(HTMLToken{
 					Type:    Character,
-					Content: string(token.input[token.curr]),
+					Content: string(currVal),
 				}, &tokens)
 			}
-			token.curr++
 
 		case RAWTEXT:
-			switch token.input[token.curr] {
+			switch currVal {
 			case lesserThan: //'<'
 				state = RAWTEXTLessThanSign
 			case null: //null
@@ -115,13 +117,12 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 			default:
 				emitToken(HTMLToken{
 					Type:    Character,
-					Content: string(token.input[token.curr]),
+					Content: string(currVal),
 				}, &tokens)
 			}
-			token.curr++
 
 		case Script:
-			switch token.input[token.curr] {
+			switch currVal {
 			case lesserThan: //'<'
 				state = ScriptDataLessThanSign
 			case null: //null
@@ -137,13 +138,12 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 			default:
 				emitToken(HTMLToken{
 					Type:    Character,
-					Content: string(token.input[token.curr]),
+					Content: string(currVal),
 				}, &tokens)
 			}
-			token.curr++
 
 		case PLAINTEXT:
-			switch token.input[token.curr] {
+			switch currVal {
 			case null: //null
 				// Parse error
 				emitToken(HTMLToken{
@@ -157,25 +157,25 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 			default:
 				emitToken(HTMLToken{
 					Type:    Character,
-					Content: string(token.input[token.curr]),
+					Content: string(currVal),
 				}, &tokens)
 			}
-			token.curr++
 
 		case TagOpen:
-			switch token.input[token.curr] {
+			switch currVal {
 			case exclamationMark: //'!'
 				state = MarkupDeclarationOpen
-				token.curr++
+
 			case solidus: //'/'
 				state = EndTagOpen
-				token.curr++
+
 			case questionMark: //'?'
 				// Parse Error
 				currToken.Type = CommentType
 				currToken.Content = ""
 				//Move to bogus comment
 				state = BogusComment
+				token.curr--
 			case endOfFile:
 				emitToken(HTMLToken{
 					Type:    Character,
@@ -184,9 +184,9 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 				emitToken(HTMLToken{
 					Type: EOF,
 				}, &tokens)
-				token.curr++
+
 			default:
-				if isASCII(token.input[token.curr]) {
+				if isASCII(currVal) {
 					// create a new start tag token
 					currToken.Type = StartTag
 					currToken.Name = ""
@@ -203,9 +203,11 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 					//Reconsume in data state
 					state = Data
 				}
+				token.curr--
 			}
+
 		case EndTagOpen:
-			switch token.input[token.curr] {
+			switch currVal {
 			case greaterThan: //'>'
 				// Parse Error
 				state = Data
@@ -223,7 +225,7 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 					Type: EOF,
 				}, &tokens)
 			default:
-				if isASCII(token.input[token.curr]) {
+				if isASCII(currVal) {
 					// create a new end tag token
 					currToken.Type = EndTag
 					currToken.Name = ""
@@ -240,10 +242,9 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 					token.curr--
 				}
 			}
-			token.curr++
 
 		case TagName:
-			switch token.input[token.curr] {
+			switch currVal {
 			case tab: //'\t'
 			case LF: //'\n'
 			case FF: //'\f'
@@ -268,16 +269,15 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 				}, &tokens)
 
 			default:
-				if isUppercase(token.input[token.curr]) {
-					currToken.Name += string(token.input[token.curr] + 0x20)
+				if isUppercase(currVal) {
+					currToken.Name += string(currVal + 0x20)
 				} else {
-					currToken.Name += string(token.input[token.curr])
+					currToken.Name += string(currVal)
 				}
 			}
-			token.curr++
 
 		case RCDATALessThanSign:
-			switch token.input[token.curr] {
+			switch currVal {
 			case solidus: //SOLIDUS
 				state = RCDATAEndTagOpen
 				tmpBuffer = ""
@@ -290,11 +290,10 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 				state = RCDATA
 				token.curr--
 			}
-			token.curr++
 
 		case RCDATAEndTagOpen:
 			// All reconsumed
-			if isASCII(token.input[token.curr]) {
+			if isASCII(currVal) {
 				currToken.Type = EndTag
 				currToken.Name = ""
 				state = RCDATAEndTagName
@@ -308,26 +307,27 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 					Content: "/", // SOLIDUS
 				}, &tokens)
 			}
+			token.curr--
 
 		case RCDATAEndTagName:
-			currChar := token.input[token.curr]
-			if currChar == tab || currChar == LF || currChar == FF {
+
+			if currVal == tab || currVal == LF || currVal == FF {
 				//ignore whitespace
-			} else if currChar == space && lastStartTagName == currToken.Name {
+			} else if currVal == space && lastStartTagName == currToken.Name {
 				state = BeforeAttributeName
-			} else if currChar == greaterThan && lastStartTagName == currToken.Name {
+			} else if currVal == greaterThan && lastStartTagName == currToken.Name {
 				state = Data
 				emitToken(currToken, &tokens)
 				currToken = HTMLToken{}
-			} else if currChar == solidus && lastStartTagName == currToken.Name {
+			} else if currVal == solidus && lastStartTagName == currToken.Name {
 				state = SelfClosingStartTag
-			} else if isUppercase(currChar) {
-				currToken.Name += currToken.Name + string(currChar+0x20)
-				tmpBuffer += string(currChar + 0x20)
-			} else if isLowercase(currChar) {
+			} else if isUppercase(currVal) {
+				currToken.Name += currToken.Name + string(currVal+0x20)
+				tmpBuffer += string(currVal + 0x20)
+			} else if isLowercase(currVal) {
 				//reconsume in RCDATA state
-				tmpBuffer += string(currChar)
-				currToken.Name = currToken.Name + string(currChar)
+				tmpBuffer += string(currVal)
+				currToken.Name = currToken.Name + string(currVal)
 			} else {
 				//emit current tag token
 				emitToken(HTMLToken{
@@ -348,10 +348,9 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 				state = RCDATA
 				token.curr--
 			}
-			token.curr++
 
 		case RAWTEXTLessThanSign:
-			switch token.input[token.curr] {
+			switch currVal {
 			case solidus: //SOLIDUS
 				state = RAWTEXTEndTagOpen
 				tmpBuffer = ""
@@ -364,11 +363,10 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 				state = RAWTEXT
 				token.curr--
 			}
-			token.curr++
 
 		case RAWTEXTEndTagOpen:
 			// All reconsumed
-			if isASCII(token.input[token.curr]) {
+			if isASCII(currVal) {
 				currToken.Type = EndTag
 				currToken.Name = ""
 				state = RAWTEXTEndTagName
@@ -384,25 +382,26 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 				//Reconsume in the RAWTEXT state
 				state = RAWTEXT
 			}
+			token.curr--
 
 		case RAWTEXTEndTagName:
-			currChar := token.input[token.curr]
-			if currChar == tab || currChar == LF || currChar == FF { //tab, LF, FF
+
+			if currVal == tab || currVal == LF || currVal == FF { //tab, LF, FF
 				//ignore whitespace
-			} else if currChar == space && lastStartTagName == currToken.Name {
+			} else if currVal == space && lastStartTagName == currToken.Name {
 				state = BeforeAttributeName
-			} else if currChar == greaterThan && lastStartTagName == currToken.Name {
+			} else if currVal == greaterThan && lastStartTagName == currToken.Name {
 				state = Data
 				emitToken(currToken, &tokens)
 				currToken = HTMLToken{}
-			} else if currChar == solidus && lastStartTagName == currToken.Name {
+			} else if currVal == solidus && lastStartTagName == currToken.Name {
 				state = SelfClosingStartTag
-			} else if isUppercase(currChar) {
-				currToken.Name += currToken.Name + string(currChar+0x20)
-				tmpBuffer += string(currChar + 0x20)
-			} else if isLowercase(currChar) {
-				currToken.Name += currToken.Name + string(currChar)
-				tmpBuffer += string(currChar)
+			} else if isUppercase(currVal) {
+				currToken.Name += currToken.Name + string(currVal+0x20)
+				tmpBuffer += string(currVal + 0x20)
+			} else if isLowercase(currVal) {
+				currToken.Name += currToken.Name + string(currVal)
+				tmpBuffer += string(currVal)
 			} else {
 				emitToken(HTMLToken{
 					Type:    Character,
@@ -423,12 +422,11 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 				state = RAWTEXT
 				token.curr--
 			}
-			token.curr++
 
 		case ScriptDataLessThanSign:
 			// All reconsumed
-			currChar := token.input[token.curr]
-			if isUppercase(currChar) {
+
+			if isUppercase(currVal) {
 				currToken.Type = EndTag
 				currToken.Name = ""
 			} else {
@@ -443,23 +441,24 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 				//Reconsume in the Script data state
 				state = Script
 			}
+			token.curr--
 
 		case ScriptDataEndTagName:
-			currChar := token.input[token.curr]
-			if currChar == tab || currChar == LF || currChar == FF {
+
+			if currVal == tab || currVal == LF || currVal == FF {
 				//ingore whitespace
-			} else if currChar == space && currToken.Name == lastStartTagName {
+			} else if currVal == space && currToken.Name == lastStartTagName {
 				state = SelfClosingStartTag
-			} else if currChar == greaterThan && currToken.Name == lastStartTagName {
+			} else if currVal == greaterThan && currToken.Name == lastStartTagName {
 				state = Data
 				emitToken(currToken, &tokens)
 				currToken = HTMLToken{}
-			} else if isUppercase(currChar) {
-				currToken.Name = currToken.Name + string(currChar+space)
-				tmpBuffer = tmpBuffer + string(currChar)
-			} else if isLowercase(currChar) {
-				currToken.Name = currToken.Name + string(currChar)
-				tmpBuffer = tmpBuffer + string(currChar)
+			} else if isUppercase(currVal) {
+				currToken.Name = currToken.Name + string(currVal+space)
+				tmpBuffer = tmpBuffer + string(currVal)
+			} else if isLowercase(currVal) {
+				currToken.Name = currToken.Name + string(currVal)
+				tmpBuffer = tmpBuffer + string(currVal)
 			} else {
 				emitToken(HTMLToken{
 					Type:    Character,
@@ -478,10 +477,9 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 				state = Script
 				token.curr--
 			}
-			token.curr++
 
 		case ScriptDataEscapeStart:
-			switch token.input[token.curr] {
+			switch currVal {
 			case dash: //'-'
 				state = ScriptDataEscapeStartDash
 				emitToken(HTMLToken{
@@ -493,10 +491,9 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 				state = Script
 				token.curr--
 			}
-			token.curr++
 
 		case ScriptDataEscapeStartDash:
-			switch token.input[token.curr] {
+			switch currVal {
 			case dash: //'-'
 				state = ScriptDataEscapeStartDash
 				emitToken(HTMLToken{
@@ -508,10 +505,9 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 				state = Script
 				token.curr--
 			}
-			token.curr++
 
 		case ScriptDataEscapedDashDash:
-			switch token.input[token.curr] {
+			switch currVal {
 			case dash: //'-'
 				emitToken(HTMLToken{
 					Type:    Character,
@@ -542,17 +538,16 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 				state = ScriptDataEscaped
 				emitToken(HTMLToken{
 					Type:    Character,
-					Content: string(token.input[token.curr]),
+					Content: string(currVal),
 				}, &tokens)
 			}
-			token.curr++
 
 		case ScriptDataEscapedLessThanSign:
-			currChar := token.input[token.curr]
-			if currChar == solidus { //Solidus
+
+			if currVal == solidus { //Solidus
 				tmpBuffer = ""
 				state = ScriptDataEscapedEndTagOpen
-			} else if isASCII(currChar) {
+			} else if isASCII(currVal) {
 				tmpBuffer = ""
 				emitToken(HTMLToken{
 					Type:    Character,
@@ -561,11 +556,10 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 				state = ScriptDataEscaped
 				token.curr--
 			}
-			token.curr++
 
 		case ScriptDataEscapedEndTagOpen:
 			// All reconsumed
-			if isASCII(token.input[token.curr]) {
+			if isASCII(currVal) {
 				currToken.Type = EndTag
 				currToken.Name = ""
 				state = ScriptDataEscapedEndTagName
@@ -580,25 +574,26 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 				}, &tokens)
 				state = ScriptDataEscaped
 			}
+			token.curr--
 
 		case ScriptDataEscapedEndTagName:
-			currChar := token.input[token.curr]
-			if currChar == tab || currChar == LF || currChar == FF {
+
+			if currVal == tab || currVal == LF || currVal == FF {
 				//ignore whitespace
-			} else if currChar == space && currToken.Name == lastStartTagName {
+			} else if currVal == space && currToken.Name == lastStartTagName {
 				state = BeforeAttributeName
-			} else if currChar == solidus && currToken.Name == lastStartTagName {
+			} else if currVal == solidus && currToken.Name == lastStartTagName {
 				state = SelfClosingStartTag
-			} else if currChar == greaterThan && currToken.Name == lastStartTagName {
+			} else if currVal == greaterThan && currToken.Name == lastStartTagName {
 				state = Data
 				emitToken(currToken, &tokens)
 				currToken = HTMLToken{}
-			} else if isUppercase(currChar) {
-				currToken.Name += string(currChar + space)
-				tmpBuffer += string(currChar)
-			} else if isLowercase(currChar) {
-				currToken.Name += string(currChar)
-				tmpBuffer += string(currChar)
+			} else if isUppercase(currVal) {
+				currToken.Name += string(currVal + space)
+				tmpBuffer += string(currVal)
+			} else if isLowercase(currVal) {
+				currToken.Name += string(currVal)
+				tmpBuffer += string(currVal)
 			} else {
 				emitToken(HTMLToken{
 					Type:    Character,
@@ -618,14 +613,13 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 				state = ScriptDataEscaped
 				token.curr--
 			}
-			token.curr++
 
 		case ScriptDataDoubleEscapeStart:
-			currChar := token.input[token.curr]
-			if currChar == tab || currChar == LF ||
-				currChar == FF || currChar == space || currChar == solidus {
+
+			if currVal == tab || currVal == LF ||
+				currVal == FF || currVal == space || currVal == solidus {
 				//ignore whitespace
-			} else if currChar == greaterThan {
+			} else if currVal == greaterThan {
 				if tmpBuffer == "script" {
 					state = ScriptDataDoubleEscaped
 				} else {
@@ -633,30 +627,29 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 				}
 				emitToken(HTMLToken{
 					Type:    Character,
-					Content: string(currChar),
+					Content: string(currVal),
 				}, &tokens)
 
-			} else if isUppercase(currChar) {
-				tmpBuffer += string(currChar + space)
+			} else if isUppercase(currVal) {
+				tmpBuffer += string(currVal + space)
 				emitToken(HTMLToken{
 					Type:    Character,
-					Content: string(currChar),
+					Content: string(currVal),
 				}, &tokens)
-			} else if isLowercase(currChar) {
-				tmpBuffer += string(currChar + space)
+			} else if isLowercase(currVal) {
+				tmpBuffer += string(currVal + space)
 				emitToken(HTMLToken{
 					Type:    Character,
-					Content: string(currChar),
+					Content: string(currVal),
 				}, &tokens)
 			} else {
 				//Reconsume
 				state = ScriptDataEscaped
 				token.curr--
 			}
-			token.curr++
 
 		case ScriptDataDoubleEscaped:
-			switch token.input[token.curr] {
+			switch currVal {
 			case dash: // '-'
 				state = ScriptDataDoubleEscapedDash
 				emitToken(HTMLToken{
@@ -681,10 +674,9 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 					Type: EOF,
 				}, &tokens)
 			}
-			token.curr++
 
 		case ScriptDataDoubleEscapedDash:
-			switch token.input[token.curr] {
+			switch currVal {
 			case dash: // '-'
 				state = ScriptDataDoubleEscapedDashDash
 				emitToken(HTMLToken{
@@ -712,13 +704,12 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 				state = ScriptDataDoubleEscaped
 				emitToken(HTMLToken{
 					Type:    Character,
-					Content: string(token.input[token.curr]),
+					Content: string(currVal),
 				}, &tokens)
 			}
-			token.curr++
 
 		case ScriptDataDoubleEscapedDashDash:
-			switch token.input[token.curr] {
+			switch currVal {
 			case dash: // '-'
 				emitToken(HTMLToken{
 					Type:    Character,
@@ -752,13 +743,12 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 				state = ScriptDataDoubleEscaped
 				emitToken(HTMLToken{
 					Type:    Character,
-					Content: string(token.input[token.curr]),
+					Content: string(currVal),
 				}, &tokens)
 			}
-			token.curr++
 
 		case ScriptDataDoubleEscapedLessThanSign:
-			if token.input[token.curr] == solidus {
+			if currVal == solidus {
 				tmpBuffer = ""
 				state = ScriptDataDoubleEscapeEnd
 				emitToken(HTMLToken{
@@ -769,14 +759,13 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 				state = ScriptDataDoubleEscaped
 				token.curr--
 			}
-			token.curr++
 
 		case ScriptDataDoubleEscapeEnd:
-			currChar := token.input[token.curr]
-			if currChar == tab || currChar == LF || currChar == FF ||
-				currChar == space || currChar == solidus {
+
+			if currVal == tab || currVal == LF || currVal == FF ||
+				currVal == space || currVal == solidus {
 				//ignore whitespace
-			} else if currChar == greaterThan {
+			} else if currVal == greaterThan {
 				if tmpBuffer == "script" {
 					state = ScriptDataEscaped
 				} else {
@@ -784,29 +773,28 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 				}
 				emitToken(HTMLToken{
 					Type:    Character,
-					Content: string(currChar),
+					Content: string(currVal),
 				}, &tokens)
-			} else if isUppercase(currChar) {
-				tmpBuffer += string(currChar + space)
+			} else if isUppercase(currVal) {
+				tmpBuffer += string(currVal + space)
 				emitToken(HTMLToken{
 					Type:    Character,
-					Content: string(currChar),
+					Content: string(currVal),
 				}, &tokens)
-			} else if isLowercase(currChar) {
-				tmpBuffer += string(currChar)
+			} else if isLowercase(currVal) {
+				tmpBuffer += string(currVal)
 				emitToken(HTMLToken{
 					Type:    Character,
-					Content: string(currChar),
+					Content: string(currVal),
 				}, &tokens)
 			} else {
 				//Reconsume
 				state = ScriptDataDoubleEscaped
 				token.curr--
 			}
-			token.curr++
 
 		case BeforeAttributeName:
-			switch token.input[token.curr] {
+			switch currVal {
 			case tab, LF, FF, space: //whitespace
 			case greaterThan, solidus: // '>' or '/'
 			case endOfFile: //EOF
@@ -815,7 +803,7 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 			case equal: // '='
 				//Parse error
 				currToken.Attributes = append(currToken.Attributes, Attribute{
-					Name:  string(token.input[token.curr]),
+					Name:  string(currVal),
 					Value: "",
 				})
 				state = AttributeName
@@ -827,10 +815,9 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 				state = AttributeName
 				token.curr--
 			}
-			token.curr++
 
 		case AttributeName:
-			switch token.input[token.curr] {
+			switch currVal {
 			case tab, LF, FF, space, solidus, greaterThan: //whitespace, '/' or '>'
 			case endOfFile:
 				state = AfterAttributeName
@@ -842,15 +829,15 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 				idx := len(currToken.Attributes) - 1
 				currToken.Attributes[idx].Name = currToken.Attributes[idx].Name + replacementChar
 			default:
-				if isUppercase(token.input[token.curr]) {
+				if isUppercase(currVal) {
 					idx := len(currToken.Attributes) - 1
-					currToken.Attributes[idx].Name = currToken.Attributes[idx].Name + string(token.input[token.curr]+space)
+					currToken.Attributes[idx].Name = currToken.Attributes[idx].Name + string(currVal+space)
 				} else {
 					idx := len(currToken.Attributes) - 1
-					currToken.Attributes[idx].Name = currToken.Attributes[idx].Name + string(token.input[token.curr])
+					currToken.Attributes[idx].Name = currToken.Attributes[idx].Name + string(currVal)
 				}
 			}
-			token.curr++
+
 			//Checking duplicates
 			if state != AttributeName {
 				// Can be faster by counting occurences in a map, relying on not so many attributes
@@ -865,7 +852,7 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 			}
 
 		case AfterAttributeName:
-			switch token.input[token.curr] {
+			switch currVal {
 			case tab, LF, FF, space: //whitespace
 			case solidus: // '/'
 				state = SelfClosingStartTag
@@ -887,10 +874,9 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 				state = AttributeName
 				token.curr--
 			}
-			token.curr++
 
 		case BeforeAttributeValue:
-			switch token.input[token.curr] {
+			switch currVal {
 			case tab, LF, FF, space: //whitespace
 			case quoteMark: // '"'
 				state = AttributeValueDoubleQuoted
@@ -904,10 +890,9 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 				state = AttributeValueUnquoted
 				token.curr--
 			}
-			token.curr++
 
 		case AttributeValueDoubleQuoted:
-			switch token.input[token.curr] {
+			switch currVal {
 			case quoteMark: //'"'
 				state = AfterAttributeValueQuoted
 			case ampersand: //'&'
@@ -923,12 +908,11 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 				}, &tokens)
 			default:
 				idx := len(currToken.Attributes) - 1
-				currToken.Attributes[idx].Value = currToken.Attributes[idx].Value + string(token.input[token.curr])
+				currToken.Attributes[idx].Value = currToken.Attributes[idx].Value + string(currVal)
 			}
-			token.curr++
 
 		case AttributeValueSingleQuoted:
-			switch token.input[token.curr] {
+			switch currVal {
 			case apostrophe: //'
 				state = AfterAttributeValueQuoted
 			case ampersand: //	"&"
@@ -944,20 +928,172 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 				}, &tokens)
 			default:
 				idx := len(currToken.Attributes) - 1
-				currToken.Attributes[idx].Value = currToken.Attributes[idx].Value + string(token.input[token.curr])
+				currToken.Attributes[idx].Value = currToken.Attributes[idx].Value + string(currVal)
 			}
-			token.curr++
 
 		case AttributeValueUnquoted:
-			switch token.input[token.curr] {
+			switch currVal {
 			case tab, LF, FF, space: //whitespace
 				state = BeforeAttributeName
+			case ampersand:
+				returnState = append(returnState, int(AttributeValueUnquoted))
+				state = CharacterReference
+			case greaterThan:
+				state = Data
+				emitToken(currToken, &tokens)
+			case null:
+				//Parse error
+				idx := len(currToken.Attributes) - 1
+				currToken.Attributes[idx].Value = currToken.Attributes[idx].Value + replacementChar
+			case endOfFile:
+				emitToken(HTMLToken{
+					Type: EOF,
+				}, &tokens)
+			default:
+				idx := len(currToken.Attributes) - 1
+				currToken.Attributes[idx].Value = currToken.Attributes[idx].Value + replacementChar
+			}
+
+		case AfterAttributeValueQuoted:
+			switch currVal {
+			case tab, LF, FF, space:
+				state = BeforeAttributeName
+			case solidus:
+				state = SelfClosingStartTag
+			case greaterThan:
+				state = Data
+				emitToken(currToken, &tokens)
+			case endOfFile:
+				emitToken(HTMLToken{
+					Type: EOF,
+				}, &tokens)
+			default:
+				//Reconsume
+				state = BeforeAttributeName
+				token.curr--
+			}
+
+		case SelfClosingStartTag:
+			switch currVal {
+			case greaterThan:
+				currToken.SelfClosingFlag = true
+				state = Data
+				emitToken(currToken, &tokens)
+			case endOfFile:
+				emitToken(HTMLToken{
+					Type: EOF,
+				}, &tokens)
+			default:
+				//Reconsume
+				state = BeforeAttributeName
+				token.curr--
+			}
+
+		case BogusComment:
+			switch currVal {
+			case greaterThan:
+				state = Data
+				emitToken(currToken, &tokens)
+			case endOfFile:
+				emitToken(currToken, &tokens)
+				emitToken(HTMLToken{
+					Type: EOF,
+				}, &tokens)
+			case null:
+				currToken.Content = currToken.Content + replacementChar
+			default:
+				currToken.Content = currToken.Content + string(currVal)
+			}
+
+		case MarkupDeclarationOpen:
+			if currVal == dash && token.input[token.curr+1] == dash {
+				currToken = HTMLToken{
+					Type:    CommentType,
+					Content: "",
+				}
+				state = CommentStart
+				token.curr++
+			} else if strings.ToLower(token.input[token.curr:token.curr+7]) == "doctype" {
+				state = Doctype
+				token.curr += 6
+			} else if strings.ToLower(token.input[token.curr:token.curr+8]) == "[cdata[" {
+				token.curr += 7
+				//TO DO: implement CDATA section
+				state = CDATASection
+			} else {
+				currToken = HTMLToken{
+					Type:    CommentType,
+					Content: "",
+				}
+				state = BogusComment
+				token.curr--
+			}
+
+		case CommentStart:
+			switch currVal {
+			case dash:
+				state = CommentStartDash
+			case greaterThan:
+				state = Data
+				emitToken(currToken, &tokens)
+				currToken = HTMLToken{}
+			default:
+				state = Comment
+				token.curr--
+			}
+
+		case CommentStartDash:
+			switch currVal {
+			case dash:
+				state = CommentEnd
+			case greaterThan:
+				state = Data
+				emitToken(currToken, &tokens)
+				currToken = HTMLToken{}
+			case endOfFile:
+				emitToken(currToken, &tokens)
+				emitToken(HTMLToken{
+					Type: EOF,
+				}, &tokens)
+			default:
+				currToken.Content = currToken.Content + string(rune(dash))
+				state = Comment
+				token.curr--
+			}
+
+		case CommentLessThanSign:
+			switch currVal {
+			case exclamationMark:
+				state = CommentLessThanSignBang
+				currToken.Content = currToken.Content + string(rune(exclamationMark))
+			case lesserThan:
+				currToken.Content = currToken.Content + string(rune(exclamationMark))
+			default:
+				state = Comment
+				token.curr--
+			}
+
+		case CommentLessThanSignBang:
+			if currVal == dash {
+				state = CommentLessThanSignBangDash
+			} else {
+				state = Comment
+				token.curr--
+			}
+
+		case CommentLessThanSignBangDash:
+			if currVal == dash {
+				state = CommentLessThanSignBangDashDash
+			} else {
+				state = CommentEndDash
+				token.curr--
 			}
 
 		default:
 			fmt.Println("Not here yet")
-			token.curr++
 		}
+		//consume the current current character (token.curr-- in individual cases otherwise)
+		token.curr++
 
 	}
 	return tokens
