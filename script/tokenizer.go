@@ -10,33 +10,7 @@ type HTMLTokenizer struct {
 	curr  int
 }
 
-const (
-	ampersand       = 0x0026
-	space           = 0x0020
-	FF              = 0x000C
-	LF              = 0x000A
-	tab             = 0x0009
-	greaterThan     = 0x003E
-	lesserThan      = 0x003C
-	equal           = 0x003D
-	null            = 0x0000
-	quoteMark       = 0x0022
-	apostrophe      = 0x0027
-	graveAccent     = 0x0060
-	replacementChar = "\uFFFD"
-	exclamationMark = 0x0021
-	solidus         = 0x002F
-	questionMark    = 0x003F
-	dash            = 0x002D
-)
-
-func emitToken(tokenToEmit HTMLToken, tokens *[]HTMLToken) {
-	*tokens = append(*tokens, tokenToEmit)
-}
-
-func NewHTMLTokenizer(input string) *HTMLTokenizer {
-	return &HTMLTokenizer{input: input, curr: 0}
-}
+//MAIN TOKENIZER FUNCTION
 
 func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 
@@ -47,7 +21,7 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 	var endOfFile byte = byte(0)
 	var tmpBuffer string = ""
 	var lastStartTagName string = ""
-	var returnState []int //a stack of return states, values are ints from enums State
+	var returnState []State //a stack of return states, values are ints from enums State
 
 	for token.curr < len(token.input) {
 		currVal := token.input[token.curr]
@@ -56,7 +30,7 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 			switch currVal {
 			case ampersand:
 				state = CharacterReference
-				returnState = append(returnState, int(Data))
+				returnState = append(returnState, Data)
 			case lesserThan: //'<'
 				state = TagOpen
 			case null: //null
@@ -80,7 +54,7 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 			switch currVal {
 			case ampersand: //'&'
 				state = CharacterReference
-				returnState = append(returnState, int(RCDATA))
+				returnState = append(returnState, RCDATA)
 			case lesserThan: //'<'
 				state = RCDATALessThanSign
 			case null: //null
@@ -174,8 +148,7 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 				currToken.Type = CommentType
 				currToken.Content = ""
 				//Move to bogus comment
-				state = BogusComment
-				token.curr--
+				reconsume(&state, BogusComment, &token.curr)
 			case endOfFile:
 				emitToken(HTMLToken{
 					Type:    Character,
@@ -186,7 +159,7 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 				}, &tokens)
 
 			default:
-				if isASCII(currVal) {
+				if isASCIIAlpha(currVal) {
 					// create a new start tag token
 					currToken.Type = StartTag
 					currToken.Name = ""
@@ -225,21 +198,20 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 					Type: EOF,
 				}, &tokens)
 			default:
-				if isASCII(currVal) {
+				if isASCIIAlpha(currVal) {
 					// create a new end tag token
 					currToken.Type = EndTag
 					currToken.Name = ""
 					currToken.Attributes = []Attribute{}
 					currToken.SelfClosingFlag = false
-					state = TagName
-					token.curr-- //reconsume in tag name state
+					//reconsume in tag name state
+					reconsume(&state, TagName, &token.curr)
 				} else {
 					// Parse Error
 					currToken.Type = CommentType
 					currToken.Content = ""
 					//Reconsume in data state
-					state = Data
-					token.curr--
+					reconsume(&state, Data, &token.curr)
 				}
 			}
 
@@ -287,13 +259,12 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 					Content: "<", // LESS-THAN SIGN
 				}, &tokens)
 				//Reconsume in RCDATA state
-				state = RCDATA
-				token.curr--
+				reconsume(&state, RCDATA, &token.curr)
 			}
 
 		case RCDATAEndTagOpen:
 			// All reconsumed
-			if isASCII(currVal) {
+			if isASCIIAlpha(currVal) {
 				currToken.Type = EndTag
 				currToken.Name = ""
 				state = RCDATAEndTagName
@@ -345,8 +316,7 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 						Content: string(char),
 					}, &tokens)
 				}
-				state = RCDATA
-				token.curr--
+				reconsume(&state, RCDATA, &token.curr)
 			}
 
 		case RAWTEXTLessThanSign:
@@ -360,13 +330,12 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 					Content: "<", // LESS-THAN SIGN
 				}, &tokens)
 				//Reconsume in RAWTEXT state
-				state = RAWTEXT
-				token.curr--
+				reconsume(&state, RAWTEXT, &token.curr)
 			}
 
 		case RAWTEXTEndTagOpen:
 			// All reconsumed
-			if isASCII(currVal) {
+			if isASCIIAlpha(currVal) {
 				currToken.Type = EndTag
 				currToken.Name = ""
 				state = RAWTEXTEndTagName
@@ -419,8 +388,7 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 					}, &tokens)
 				}
 				// Reconsume in the RAWTEXT state
-				state = RAWTEXT
-				token.curr--
+				reconsume(&state, RAWTEXT, &token.curr)
 			}
 
 		case ScriptDataLessThanSign:
@@ -474,8 +442,7 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 						Content: string(char),
 					}, &tokens)
 				}
-				state = Script
-				token.curr--
+				reconsume(&state, Script, &token.curr)
 			}
 
 		case ScriptDataEscapeStart:
@@ -488,8 +455,7 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 				}, &tokens)
 			default:
 				//Reconsume in the script data state
-				state = Script
-				token.curr--
+				reconsume(&state, Script, &token.curr)
 			}
 
 		case ScriptDataEscapeStartDash:
@@ -502,8 +468,7 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 				}, &tokens)
 			default:
 				//Reconsume in the script data state
-				state = Script
-				token.curr--
+				reconsume(&state, Script, &token.curr)
 			}
 
 		case ScriptDataEscapedDashDash:
@@ -544,33 +509,32 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 
 		case ScriptDataEscapedLessThanSign:
 
-			if currVal == solidus { //Solidus
+			if currVal == solidus {
 				tmpBuffer = ""
 				state = ScriptDataEscapedEndTagOpen
-			} else if isASCII(currVal) {
+			} else if isASCIIAlpha(currVal) {
 				tmpBuffer = ""
 				emitToken(HTMLToken{
 					Type:    Character,
-					Content: "<", // '<'
+					Content: "<",
 				}, &tokens)
-				state = ScriptDataEscaped
-				token.curr--
+				reconsume(&state, ScriptDataEscaped, &token.curr)
 			}
 
 		case ScriptDataEscapedEndTagOpen:
 			// All reconsumed
-			if isASCII(currVal) {
+			if isASCIIAlpha(currVal) {
 				currToken.Type = EndTag
 				currToken.Name = ""
 				state = ScriptDataEscapedEndTagName
 			} else {
 				emitToken(HTMLToken{
 					Type:    Character,
-					Content: "<", // '<'
+					Content: "<",
 				}, &tokens)
 				emitToken(HTMLToken{
 					Type:    Character,
-					Content: "/", // '/'
+					Content: "/",
 				}, &tokens)
 				state = ScriptDataEscaped
 			}
@@ -610,8 +574,7 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 					}, &tokens)
 				}
 				//Reconsume
-				state = ScriptDataEscaped
-				token.curr--
+				reconsume(&state, ScriptDataEscaped, &token.curr)
 			}
 
 		case ScriptDataDoubleEscapeStart:
@@ -644,8 +607,7 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 				}, &tokens)
 			} else {
 				//Reconsume
-				state = ScriptDataEscaped
-				token.curr--
+				reconsume(&state, ScriptDataEscaped, &token.curr)
 			}
 
 		case ScriptDataDoubleEscaped:
@@ -756,8 +718,7 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 					Content: "/",
 				}, &tokens)
 			} else {
-				state = ScriptDataDoubleEscaped
-				token.curr--
+				reconsume(&state, ScriptDataDoubleEscaped, &token.curr)
 			}
 
 		case ScriptDataDoubleEscapeEnd:
@@ -789,8 +750,7 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 				}, &tokens)
 			} else {
 				//Reconsume
-				state = ScriptDataDoubleEscaped
-				token.curr--
+				reconsume(&state, ScriptDataDoubleEscaped, &token.curr)
 			}
 
 		case BeforeAttributeName:
@@ -798,8 +758,7 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 			case tab, LF, FF, space: //whitespace
 			case greaterThan, solidus: // '>' or '/'
 			case endOfFile: //EOF
-				state = AfterAttributeName
-				token.curr--
+				reconsume(&state, AfterAttributeName, &token.curr)
 			case equal: // '='
 				//Parse error
 				currToken.Attributes = append(currToken.Attributes, Attribute{
@@ -812,16 +771,14 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 					Name:  "",
 					Value: "",
 				})
-				state = AttributeName
-				token.curr--
+				reconsume(&state, AttributeName, &token.curr)
 			}
 
 		case AttributeName:
 			switch currVal {
 			case tab, LF, FF, space, solidus, greaterThan: //whitespace, '/' or '>'
 			case endOfFile:
-				state = AfterAttributeName
-				token.curr--
+				reconsume(&state, AfterAttributeName, &token.curr)
 			case equal:
 				state = BeforeAttributeValue
 			case null:
@@ -871,8 +828,7 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 					Name:  "",
 					Value: "",
 				})
-				state = AttributeName
-				token.curr--
+				reconsume(&state, AttributeName, &token.curr)
 			}
 
 		case BeforeAttributeValue:
@@ -887,8 +843,7 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 				state = Data
 				emitToken(currToken, &tokens)
 			default:
-				state = AttributeValueUnquoted
-				token.curr--
+				reconsume(&state, AttributeValueUnquoted, &token.curr)
 			}
 
 		case AttributeValueDoubleQuoted:
@@ -896,7 +851,7 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 			case quoteMark: //'"'
 				state = AfterAttributeValueQuoted
 			case ampersand: //'&'
-				returnState = append(returnState, int(AttributeValueDoubleQuoted))
+				returnState = append(returnState, AttributeValueDoubleQuoted)
 				state = CharacterReference
 			case null:
 				//Parse error
@@ -916,7 +871,7 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 			case apostrophe: //'
 				state = AfterAttributeValueQuoted
 			case ampersand: //	"&"
-				returnState = append(returnState, int(AttributeValueSingleQuoted))
+				returnState = append(returnState, AttributeValueSingleQuoted)
 				state = CharacterReference
 			case null: //null
 				//Parse error
@@ -936,7 +891,7 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 			case tab, LF, FF, space: //whitespace
 				state = BeforeAttributeName
 			case ampersand:
-				returnState = append(returnState, int(AttributeValueUnquoted))
+				returnState = append(returnState, AttributeValueUnquoted)
 				state = CharacterReference
 			case greaterThan:
 				state = Data
@@ -969,8 +924,7 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 				}, &tokens)
 			default:
 				//Reconsume
-				state = BeforeAttributeName
-				token.curr--
+				reconsume(&state, BeforeAttributeName, &token.curr)
 			}
 
 		case SelfClosingStartTag:
@@ -985,8 +939,7 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 				}, &tokens)
 			default:
 				//Reconsume
-				state = BeforeAttributeName
-				token.curr--
+				reconsume(&state, BeforeAttributeName, &token.curr)
 			}
 
 		case BogusComment:
@@ -1027,6 +980,7 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 				}
 				state = BogusComment
 				token.curr--
+				reconsume(&state, BogusComment, &token.curr)
 			}
 
 		case CommentStart:
@@ -1038,8 +992,7 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 				emitToken(currToken, &tokens)
 				currToken = HTMLToken{}
 			default:
-				state = Comment
-				token.curr--
+				reconsume(&state, Comment, &token.curr)
 			}
 
 		case CommentStartDash:
@@ -1057,8 +1010,7 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 				}, &tokens)
 			default:
 				currToken.Content = currToken.Content + string(rune(dash))
-				state = Comment
-				token.curr--
+				reconsume(&state, Comment, &token.curr)
 			}
 
 		case CommentLessThanSign:
@@ -1069,30 +1021,594 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 			case lesserThan:
 				currToken.Content = currToken.Content + string(rune(exclamationMark))
 			default:
-				state = Comment
-				token.curr--
+				reconsume(&state, Comment, &token.curr)
 			}
 
 		case CommentLessThanSignBang:
 			if currVal == dash {
 				state = CommentLessThanSignBangDash
 			} else {
-				state = Comment
-				token.curr--
+				reconsume(&state, Comment, &token.curr)
 			}
 
 		case CommentLessThanSignBangDash:
 			if currVal == dash {
 				state = CommentLessThanSignBangDashDash
 			} else {
+				reconsume(&state, CommentEndDash, &token.curr)
+			}
+
+		case CommentLessThanSignBangDashDash:
+			if currVal == greaterThan || currVal == endOfFile {
+				reconsume(&state, CommentEnd, &token.curr)
+			} else {
+				//Nested comment parse error
+				reconsume(&state, CommentEnd, &token.curr)
+			}
+
+		case CommentEndDash:
+			switch currVal {
+			case dash:
+				state = CommentEnd
+			case endOfFile:
+				//EOF in comment error
+				emitToken(currToken, &tokens)
+				emitToken(HTMLToken{
+					Type: EOF,
+				}, &tokens)
+			default:
+				currToken.Content += "-"
+				reconsume(&state, Comment, &token.curr)
+			}
+
+		case CommentEnd:
+			switch currVal {
+			case greaterThan:
+				state = Data
+				emitToken(currToken, &tokens)
+				currToken = HTMLToken{}
+			case exclamationMark:
+				state = CommentEndBang
+			case dash:
+				currToken.Content += "-"
+			case endOfFile:
+				//EOF in commment parse error
+				emitToken(currToken, &tokens)
+				currToken = HTMLToken{}
+				emitToken(HTMLToken{
+					Type: EOF,
+				}, &tokens)
+			default:
+				currToken.Content += "--"
+				reconsume(&state, Comment, &token.curr)
+			}
+
+		case CommentEndBang:
+			switch currVal {
+			case dash:
+				currToken.Content += "--!"
 				state = CommentEndDash
-				token.curr--
+			case greaterThan:
+				//Incorrectly closed comment parse error
+				state = Data
+				emitToken(currToken, &tokens)
+				currToken = HTMLToken{}
+			case endOfFile:
+				//EOF in comment parse error
+				emitToken(currToken, &tokens)
+				currToken = HTMLToken{}
+				emitToken(HTMLToken{
+					Type: EOF,
+				}, &tokens)
+			default:
+				currToken.Content += "--!"
+				reconsume(&state, Comment, &token.curr)
+			}
+
+		case Doctype:
+			switch currVal {
+			case tab, LF, FF, space:
+				state = BeforeDOCTYPEName
+			case greaterThan:
+				reconsume(&state, BeforeAttributeName, &token.curr)
+			case endOfFile:
+				//end of file in doctype error
+				emitToken(currToken, &tokens)
+				currToken = HTMLToken{
+					Type:            DOCTYPE,
+					ForceQuirksFlag: true,
+				}
+				emitToken(HTMLToken{
+					Type: EOF,
+				}, &tokens)
+			default:
+				//missing whitespace before name parse error
+				reconsume(&state, BeforeDOCTYPEName, &token.curr)
+			}
+
+		case BeforeDOCTYPEName:
+			if currVal == tab || currVal == LF || currVal == FF || currVal == space {
+				//ignore the char
+			} else if isUppercase(currVal) {
+				currToken = HTMLToken{
+					Type: DOCTYPE,
+					Name: string(currVal),
+				}
+				state = DOCTYPEName
+			} else if currVal == null {
+				//unexpected null char parse error
+				currToken = HTMLToken{
+					Type: DOCTYPE,
+					Name: replacementChar,
+				}
+				state = DOCTYPEName
+			} else if currVal == greaterThan {
+				//missing doctype name parse error
+				emitToken(currToken, &tokens)
+				currToken = HTMLToken{
+					Type:            DOCTYPE,
+					ForceQuirksFlag: true,
+				}
+				state = Data
+			} else if currVal == endOfFile {
+				//EOF in doctype error
+				emitToken(currToken, &tokens)
+				currToken = HTMLToken{
+					Type:            DOCTYPE,
+					ForceQuirksFlag: true,
+				}
+				emitToken(HTMLToken{
+					Type: EOF,
+				}, &tokens)
+			} else {
+				currToken = HTMLToken{
+					Type: DOCTYPE,
+					Name: string(currVal),
+				}
+				state = DOCTYPEName
+			}
+
+		case DOCTYPEName:
+			if currVal == tab || currVal == LF || currVal == FF || currVal == space {
+				state = AfterDOCTYPEName
+			} else if currVal == greaterThan {
+				state = Data
+				emitToken(currToken, &tokens)
+				currToken = HTMLToken{}
+			} else if isUppercase(currVal) {
+				currToken.Name += string(currVal - 0x20)
+			} else if currVal == null {
+				//unexpected null char error
+				currToken.Name += replacementChar
+			} else if currVal == endOfFile {
+				//EOF in doctype error
+				currToken.ForceQuirksFlag = true
+				emitToken(currToken, &tokens)
+				currToken = HTMLToken{}
+				emitToken(HTMLToken{
+					Type: EOF,
+				}, &tokens)
+			} else {
+				currToken.Name += string(currVal)
+			}
+
+		case AfterDOCTYPEName:
+			switch currVal {
+			case tab, LF, FF, space:
+				//ignore
+			case greaterThan:
+				state = Data
+				emitToken(currToken, &tokens)
+				currToken = HTMLToken{}
+			case endOfFile:
+				//EOF in Doctype Parse Error
+				currToken.ForceQuirksFlag = true
+			default:
+				if nameInDoctype(token, token.curr, true) {
+					token.curr += 5 //plus the default increment
+					state = AfterDOCTYPEPublicKeyword
+				} else if nameInDoctype(token, token.curr, false) {
+					token.curr += 5
+					state = AfterDOCTYPESystemKeyword
+				} else {
+					//Invalid char seq
+					currToken.ForceQuirksFlag = true
+					reconsume(&state, BogusDOCTYPE, &token.curr)
+				}
+			}
+
+		case AfterDOCTYPEPublicKeyword:
+			switch currVal {
+			case tab, LF, FF, space:
+				state = BeforeDOCTYPEPublicIdentifier
+			case quoteMark:
+				//missing whitespace after doctype public keyword error
+				currToken.PublicID = ""
+				state = DOCTYPEPublicIdentifierDoubleQuoted
+			case apostrophe:
+				//error
+				currToken.PublicID = ""
+				state = DOCTYPEPublicIdentifierSingleQuoted
+			case greaterThan:
+				//error
+				currToken.ForceQuirksFlag = true
+				state = Data
+				emitToken(currToken, &tokens)
+				currToken = HTMLToken{}
+			case endOfFile:
+				//error
+				currToken.ForceQuirksFlag = true
+				emitToken(currToken, &tokens)
+				currToken = HTMLToken{}
+				reconsume(&state, BogusDOCTYPE, &token.curr)
+			default:
+				//error
+				currToken.ForceQuirksFlag = true
+				reconsume(&state, BogusDOCTYPE, &token.curr)
+			}
+
+		case BeforeDOCTYPEPublicIdentifier:
+			switch currVal {
+			case tab, LF, FF, space:
+				//ignore
+			case quoteMark:
+				currToken.PublicID = ""
+				state = DOCTYPEPublicIdentifierDoubleQuoted
+			case apostrophe:
+				currToken.PublicID = ""
+				state = DOCTYPEPublicIdentifierSingleQuoted
+			case greaterThan:
+				//error
+				currToken.ForceQuirksFlag = true
+				state = Data
+				emitToken(currToken, &tokens)
+				currToken = HTMLToken{}
+			case endOfFile:
+				//parse error
+				currToken.ForceQuirksFlag = true
+				emitToken(currToken, &tokens)
+				currToken = HTMLToken{}
+				emitToken(HTMLToken{
+					Type: EOF,
+				}, &tokens)
+			default:
+				//parse error
+				currToken.ForceQuirksFlag = true
+				reconsume(&state, BogusDOCTYPE, &token.curr)
+			}
+
+		case DOCTYPEPublicIdentifierDoubleQuoted:
+			switch currVal {
+			case quoteMark:
+				state = AfterDOCTYPEPublicIdentifier
+			case null:
+				//error
+				currToken.PublicID += replacementChar
+			case greaterThan:
+				//error
+				currToken.ForceQuirksFlag = true
+				state = Data
+				emitToken(currToken, &tokens)
+				currToken = HTMLToken{}
+			case endOfFile:
+				//parse error
+				currToken.ForceQuirksFlag = true
+				emitToken(currToken, &tokens)
+				currToken = HTMLToken{}
+				emitToken(HTMLToken{
+					Type: EOF,
+				}, &tokens)
+			default:
+				currToken.PublicID += string(currVal)
+			}
+
+		case DOCTYPEPublicIdentifierSingleQuoted:
+			switch currVal {
+			case apostrophe:
+				state = AfterDOCTYPEPublicIdentifier
+			case null:
+				//parse error
+				currToken.PublicID += replacementChar
+			case greaterThan:
+				//parse error
+				currToken.ForceQuirksFlag = true
+				state = Data
+				emitToken(currToken, &tokens)
+				currToken = HTMLToken{}
+			case endOfFile:
+				//parse error
+				currToken.ForceQuirksFlag = true
+				state = Data
+				emitToken(currToken, &tokens)
+				currToken = HTMLToken{}
+				emitToken(HTMLToken{
+					Type: EOF,
+				}, &tokens)
+			default:
+				currToken.PublicID += string(currVal)
+			}
+
+		case AfterDOCTYPEPublicIdentifier:
+			switch currVal {
+			case tab, LF, FF, space:
+				state = BetweenDOCTYPEPublicAndSystemIdentifiers
+			case greaterThan:
+				state = Data
+				emitToken(currToken, &tokens)
+				currToken = HTMLToken{}
+			case quoteMark:
+				//parse error
+				currToken.SystemID = ""
+				state = DOCTYPESystemIdentifierDoubleQuoted
+			case apostrophe:
+				//parse error
+				currToken.SystemID = ""
+				state = DOCTYPESystemIdentifierSingleQuoted
+			case endOfFile:
+				//parse error
+				currToken.ForceQuirksFlag = true
+				emitToken(currToken, &tokens)
+				currToken = HTMLToken{}
+				emitToken(HTMLToken{
+					Type: EOF,
+				}, &tokens)
+			default:
+				//parse error
+				currToken.SelfClosingFlag = true
+				reconsume(&state, BogusDOCTYPE, &token.curr)
+			}
+
+		case BetweenDOCTYPEPublicAndSystemIdentifiers:
+			switch currVal {
+			case tab, LF, FF, space:
+				//ignore
+			case greaterThan:
+				state = Data
+				emitToken(currToken, &tokens)
+				currToken = HTMLToken{}
+			case quoteMark:
+				currToken.SystemID = ""
+				state = DOCTYPESystemIdentifierDoubleQuoted
+			case apostrophe:
+				currToken.SystemID = ""
+				state = DOCTYPESystemIdentifierSingleQuoted
+			case endOfFile:
+				//parse error
+				currToken.ForceQuirksFlag = true
+				emitToken(currToken, &tokens)
+				currToken = HTMLToken{}
+				emitToken(HTMLToken{
+					Type: EOF,
+				}, &tokens)
+			default:
+				//parse error
+				currToken.ForceQuirksFlag = true
+				reconsume(&state, BogusDOCTYPE, &token.curr)
+			}
+
+		case AfterDOCTYPESystemKeyword:
+			switch currVal {
+			case tab, LF, FF, space:
+				state = BeforeDOCTYPESystemIdentifier
+			case quoteMark:
+				//parse error
+				currToken.SystemID = ""
+				state = DOCTYPESystemIdentifierDoubleQuoted
+			case apostrophe:
+				//parse error
+				currToken.SystemID = ""
+				state = DOCTYPESystemIdentifierSingleQuoted
+			case greaterThan:
+				//parse error
+				currToken.ForceQuirksFlag = true
+				state = Data
+				emitToken(currToken, &tokens)
+				currToken = HTMLToken{}
+			case endOfFile:
+				//parse error
+				currToken.ForceQuirksFlag = true
+				emitToken(currToken, &tokens)
+				currToken = HTMLToken{}
+				emitToken(HTMLToken{
+					Type: EOF,
+				}, &tokens)
+			default:
+				//parse error
+				currToken.ForceQuirksFlag = true
+				reconsume(&state, BogusDOCTYPE, &token.curr)
+			}
+
+		case BeforeDOCTYPESystemIdentifier:
+			switch currVal {
+			case tab, LF, FF, space:
+				//ignore
+			case quoteMark:
+				currToken.SystemID = ""
+				state = DOCTYPESystemIdentifierDoubleQuoted
+			case apostrophe:
+				currToken.SystemID = ""
+				state = DOCTYPESystemIdentifierSingleQuoted
+			case greaterThan:
+				//parse error
+				currToken.ForceQuirksFlag = true
+				state = Data
+				emitToken(currToken, &tokens)
+				currToken = HTMLToken{}
+			case endOfFile:
+				//parse error
+				currToken.ForceQuirksFlag = true
+				emitToken(currToken, &tokens)
+				emitToken(HTMLToken{
+					Type: EOF,
+				}, &tokens)
+			default:
+				//parse error
+				currToken.ForceQuirksFlag = true
+				reconsume(&state, BogusDOCTYPE, &token.curr)
+			}
+
+		case DOCTYPESystemIdentifierDoubleQuoted:
+			switch currVal {
+			case quoteMark:
+				state = AfterDOCTYPESystemIdentifier
+			case null:
+				//parse error
+				currToken.SystemID += replacementChar
+			case greaterThan:
+				//parse error
+				currToken.ForceQuirksFlag = true
+				state = Data
+				emitToken(currToken, &tokens)
+				currToken = HTMLToken{}
+			case endOfFile:
+				//parse error
+				currToken.ForceQuirksFlag = true
+				emitToken(currToken, &tokens)
+				currToken = HTMLToken{}
+				emitToken(HTMLToken{
+					Type: EOF,
+				}, &tokens)
+			default:
+				currToken.SystemID += string(currVal)
+			}
+
+		case DOCTYPESystemIdentifierSingleQuoted:
+			switch currVal {
+			case apostrophe:
+				state = AfterDOCTYPESystemIdentifier
+			case null:
+				//parse
+				currToken.SystemID += replacementChar
+			case greaterThan:
+				//parse error
+				currToken.ForceQuirksFlag = true
+				state = Data
+				emitToken(currToken, &tokens)
+			case endOfFile:
+				//parse error
+				currToken.ForceQuirksFlag = true
+				emitToken(currToken, &tokens)
+				currToken = HTMLToken{}
+				emitToken(HTMLToken{
+					Type: EOF,
+				}, &tokens)
+			default:
+				currToken.SystemID += string(currVal)
+			}
+
+		case AfterDOCTYPESystemIdentifier:
+			switch currVal {
+			case tab, LF, FF, space:
+				//ignore
+			case greaterThan:
+				state = Data
+				emitToken(currToken, &tokens)
+				currToken = HTMLToken{}
+			case endOfFile:
+				//parse error
+				currToken.ForceQuirksFlag = true
+				emitToken(currToken, &tokens)
+				currToken = HTMLToken{}
+				emitToken(HTMLToken{
+					Type: EOF,
+				}, &tokens)
+			default:
+				//parse error, no flag
+				reconsume(&state, BogusDOCTYPE, &token.curr)
+			}
+
+		case BogusDOCTYPE:
+			switch currVal {
+			case greaterThan:
+				state = Data
+				emitToken(currToken, &tokens)
+			case null:
+				//parse error
+				//ignore
+			case endOfFile:
+				emitToken(currToken, &tokens)
+				emitToken(HTMLToken{
+					Type: EOF,
+				}, &tokens)
+			default:
+				//ignore
+			}
+
+		case CDATASection:
+			switch currVal {
+			case rightSquareBracket:
+				state = CDATASectionBracket
+			case endOfFile:
+				//parse error
+				emitToken(HTMLToken{
+					Type: EOF,
+				}, &tokens)
+			default:
+				emitToken(currToken, &tokens)
+			}
+
+		case CDATASectionBracket:
+			switch currVal {
+			case rightSquareBracket:
+				state = CDATASectionEnd
+			default:
+				emitToken(HTMLToken{
+					Type:    Character,
+					Content: "]",
+				}, &tokens)
+				reconsume(&state, CDATASection, &token.curr)
+			}
+
+		case CDATASectionEnd:
+			switch currVal {
+			case rightSquareBracket:
+				emitToken(HTMLToken{
+					Type:    Character,
+					Content: "]",
+				}, &tokens)
+			case greaterThan:
+				state = Data
+			default:
+				rightBracket := HTMLToken{
+					Type:    Character,
+					Content: "]",
+				}
+				emitToken(rightBracket, &tokens)
+				emitToken(rightBracket, &tokens)
+				reconsume(&state, CDATASection, &token.curr)
+			}
+
+		case CharacterReference:
+			tmpBuffer = "&"
+			if isASCIIAlphanumeric(currVal) {
+				reconsume(&state, NamedCharacterReference, &token.curr)
+			} else if currVal == numberSign {
+				tmpBuffer += string(currVal)
+				state = NumericCharacterReference
+			} else {
+				prev := popState(&returnState)
+				flushCodePoints(&currToken, prev, tmpBuffer, &tokens)
+				tmpBuffer = ""
+				reconsume(&state, prev, &token.curr)
+			}
+
+		case NamedCharacterReference:
+			for isASCIIAlpha(currVal) {
+				tmpBuffer += string(currVal)
+				token.curr++
+				currVal = token.input[token.curr]
+			}
+			token.curr--
+
+		case AmbiguousAmpersand:
+			if isASCIIAlphanumeric(currVal) {
+				fmt.Println("Not here yet")
 			}
 
 		default:
 			fmt.Println("Not here yet")
 		}
-		//consume the current current character (token.curr-- in individual cases otherwise)
+		//consume the current current character (token.curr-- in individual cases otherwise or reconsume func)
 		token.curr++
 
 	}

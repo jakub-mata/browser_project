@@ -1,23 +1,5 @@
 package main
 
-func isASCII(s byte) bool {
-	return s <= 127
-}
-
-func isUppercase(s byte) bool {
-	if s >= 65 && s <= 90 {
-		return true
-	}
-	return false
-}
-
-func isLowercase(s byte) bool {
-	if s >= 97 && s <= 122 {
-		return true
-	}
-	return false
-}
-
 type TokenType uint8
 
 const (
