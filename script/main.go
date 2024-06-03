@@ -10,8 +10,6 @@ func main() {
 		panic(err)
 	}
 
-	//htmlTokens := html.NewTokenizer(resp)
-
 	testToken := NewHTMLTokenizer(body)
 	tokens := TokenizeHTML(testToken)
 	for i := 0; i < len(tokens); i++ {

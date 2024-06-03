@@ -28,6 +28,10 @@ const (
 	numberSign         = 0x0023
 )
 
+func isNewline(check byte) bool {
+	return (check == 0x0A) || (check == 0x0D)
+}
+
 func isASCIIAlpha(s byte) bool {
 	return isUppercase(s) || isLowercase(s)
 }

@@ -43,10 +43,12 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 					Type: EOF,
 				}, &tokens)
 			default:
-				emitToken(HTMLToken{
-					Type:    Character,
-					Content: string(currVal),
-				}, &tokens)
+				if !isNewline(currVal) {
+					emitToken(HTMLToken{
+						Type:    Character,
+						Content: string(currVal),
+					}, &tokens)
+				}
 			}
 
 		case RCDATA:
