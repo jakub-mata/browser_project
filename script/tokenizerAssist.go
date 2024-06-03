@@ -66,13 +66,18 @@ func emitToken(tokenToEmit HTMLToken, tokens *[]HTMLToken) {
 	*tokens = append(*tokens, tokenToEmit)
 }
 
+func emitCurrToken(currToken *HTMLToken, tokens *[]HTMLToken) {
+	emitToken(*currToken, tokens)
+	*currToken = HTMLToken{}
+}
+
 func NewHTMLTokenizer(input []byte) *HTMLTokenizer {
 	return &HTMLTokenizer{input: input, curr: 0}
 }
 
 func reconsume(state *State, switchTo State, pointer *int) {
 	*state = switchTo
-	*pointer++
+	*pointer--
 }
 
 func nameInDoctype(token *HTMLTokenizer, pointer int, id bool) bool {

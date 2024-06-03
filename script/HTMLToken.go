@@ -30,8 +30,8 @@ type HTMLToken struct {
 func (t HTMLToken) String() string {
 	var sb strings.Builder
 
-	sb.WriteString(fmt.Sprintf("Type: %v, Name: %s, PublicID: %s, SystemID: %s, ForceQuirksFlag: %v, SelfClosingFlag: %v, Content: %s\n",
-		getTokenType(t.Type), t.Name, t.PublicID, t.SystemID, t.ForceQuirksFlag, t.SelfClosingFlag, t.Content))
+	sb.WriteString(fmt.Sprintf("Type: %v, Name: %s, Content: %s, ",
+		getTokenType(t.Type), t.Name, t.Content))
 
 	for i, attr := range t.Attributes {
 		if i != 0 {

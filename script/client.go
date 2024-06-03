@@ -22,6 +22,5 @@ func httpClient(url string) ([]byte, error) {
 	if err != nil {
 		return bodyBytes, err
 	}
-	fmt.Println(string(bodyBytes))
 	return bodyBytes, nil
 }
