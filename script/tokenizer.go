@@ -2,11 +2,10 @@ package main
 
 import (
 	"fmt"
-	"strings"
 )
 
 type HTMLTokenizer struct {
-	input string
+	input []byte
 	curr  int
 }
 
@@ -966,10 +965,10 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 				}
 				state = CommentStart
 				token.curr++
-			} else if strings.ToLower(token.input[token.curr:token.curr+7]) == "doctype" {
+			} else if Lower(token.input[token.curr:token.curr+7]) == "doctype" {
 				state = Doctype
 				token.curr += 6
-			} else if strings.ToLower(token.input[token.curr:token.curr+8]) == "[cdata[" {
+			} else if Lower(token.input[token.curr:token.curr+8]) == "[cdata[" {
 				token.curr += 7
 				//TO DO: implement CDATA section
 				state = CDATASection

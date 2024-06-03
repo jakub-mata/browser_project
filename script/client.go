@@ -7,18 +7,21 @@ import (
 	"time"
 )
 
-func httpClient(url string) io.ReadCloser {
+func httpClient(url string) ([]byte, error) {
 
 	client := http.Client{Timeout: time.Duration(1) * time.Second} //add cookies
 	resp, err := client.Get(url)
 	if err != nil {
 		fmt.Println("Error during http request")
-		panic(err)
+		var empty []byte
+		return empty, err
 	}
 	defer resp.Body.Close()
 
-	return resp.Body
-
-	//fmt.Printf("Body: %s", body)
-
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return bodyBytes, err
+	}
+	fmt.Println(string(bodyBytes))
+	return bodyBytes, nil
 }

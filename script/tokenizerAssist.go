@@ -1,6 +1,9 @@
 package main
 
-import "slices"
+import (
+	"slices"
+	"strings"
+)
 
 const (
 	ampersand          = 0x0026
@@ -51,11 +54,19 @@ func isLowercase(s byte) bool {
 	return false
 }
 
+func Lower(bytes []byte) string {
+	var sb strings.Builder
+	for i := 0; i < len(bytes); i++ {
+		sb.WriteString(string(bytes[i]))
+	}
+	return strings.ToLower(sb.String())
+}
+
 func emitToken(tokenToEmit HTMLToken, tokens *[]HTMLToken) {
 	*tokens = append(*tokens, tokenToEmit)
 }
 
-func NewHTMLTokenizer(input string) *HTMLTokenizer {
+func NewHTMLTokenizer(input []byte) *HTMLTokenizer {
 	return &HTMLTokenizer{input: input, curr: 0}
 }
 

@@ -4,23 +4,15 @@ import (
 	"fmt"
 )
 
-var testHTML string = `
-<!DOCTYPE html>
-<html>
-    <head>
-
-    </head>
-    <body>
-        <h1>
-            Hello World
-        </h1>
-    </body>
-</html>
-`
-
 func main() {
-	//httpClient("https://www.google.com")
-	testToken := NewHTMLTokenizer(testHTML)
+	body, err := httpClient("http://0.0.0.0:8080/")
+	if err != nil {
+		panic(err)
+	}
+
+	testToken := NewHTMLTokenizer(body)
 	tokens := TokenizeHTML(testToken)
-	fmt.Println(tokens)
+	for i := 0; i < len(tokens); i++ {
+		fmt.Println(tokens[i])
+	}
 }

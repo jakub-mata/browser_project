@@ -1,5 +1,10 @@
 package main
 
+import (
+	"fmt"
+	"strings"
+)
+
 type TokenType uint8
 
 const (
@@ -20,6 +25,40 @@ type HTMLToken struct {
 	SelfClosingFlag bool   //start and end tags
 	Attributes      []Attribute
 	Content         string //comments and characters
+}
+
+func (t HTMLToken) String() string {
+	var sb strings.Builder
+
+	sb.WriteString(fmt.Sprintf("Type: %v, Name: %s, PublicID: %s, SystemID: %s, ForceQuirksFlag: %v, SelfClosingFlag: %v, Content: %s\n",
+		getTokenType(t.Type), t.Name, t.PublicID, t.SystemID, t.ForceQuirksFlag, t.SelfClosingFlag, t.Content))
+
+	for i, attr := range t.Attributes {
+		if i != 0 {
+			sb.WriteString(", ")
+		}
+		sb.WriteString(fmt.Sprintf("Attribute[%d]: Name=%s, Value=%s", i+1, attr.Name, attr.Value))
+	}
+
+	return sb.String()
+}
+
+func getTokenType(t TokenType) string {
+	switch t {
+	case DOCTYPE:
+		return "DOCTYPE"
+	case StartTag:
+		return "StartTag"
+	case EndTag:
+		return "EndTag"
+	case CommentType:
+		return "Comment"
+	case Character:
+		return "Character"
+	case EOF:
+		return "EOF"
+	}
+	return "Error"
 }
 
 type Attribute struct {
