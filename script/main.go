@@ -15,4 +15,10 @@ func main() {
 	for i := 0; i < len(tokens); i++ {
 		fmt.Println(tokens[i])
 	}
+
+	root, err := buildParseTree(tokens)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf(root.Root.Token.Name)
 }
