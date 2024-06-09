@@ -1,15 +1,14 @@
 package main
 
 import (
-	"errors"
 	"strings"
 )
 
-const htmlTag string = "html"
+//const htmlTag string = "html"
 
 type TreeVertex struct {
 	Token    HTMLToken
-	Children []HTMLToken
+	Children []*TreeVertex
 	Text     strings.Builder
 	Parent   *TreeVertex
 }
@@ -18,41 +17,31 @@ type TreeRoot struct {
 	Root TreeVertex
 }
 
-func findRoot(tokens []HTMLToken) (TreeRoot, int, error) {
-	var root TreeRoot
-	for idx, token := range tokens {
-		if token.Name == htmlTag {
-			root.Root.Token = token
-			return root, idx, nil
-		}
-	}
-	return root, 0, errors.New("no html tag in document")
+func createRoot(rootToken HTMLToken) TreeRoot {
+	return TreeRoot{TreeVertex{rootToken, nil, strings.Builder{}, nil}}
 }
 
-func findComplementaryOpenTag(node *TreeVertex) *TreeVertex {
-	prevNode := node.Parent
-	for prevNode.Token.Name != node.Token.Name {
+func findComplementaryOpenTag(node *TreeVertex, name string) *TreeVertex {
+	prevNode := node
+	for prevNode.Token.Name != name {
 		prevNode = prevNode.Parent
 	}
 	return prevNode
 }
 
 func buildParseTree(tokens []HTMLToken) (TreeRoot, error) {
-	root, rootIdx, err := findRoot(tokens)
-	if err != nil {
-		return root, err
-	}
+	root := createRoot(tokens[0]) //findRoot(tokens)
 
-	currentNode := root.Root
-	for i := rootIdx + 1; i < len(tokens); i++ {
+	currentNode := &root.Root
+	for i := 1; i < len(tokens); i++ {
 		token := tokens[i]
 		switch token.Type {
-		case StartTag:
-			child := TreeVertex{token, nil, strings.Builder{}, &currentNode}
-			currentNode.Children = append(currentNode.Children, child.Token)
-			currentNode = child
+		case StartTag, DOCTYPE:
+			child := TreeVertex{token, nil, strings.Builder{}, currentNode}
+			currentNode.Children = append(currentNode.Children, &child)
+			currentNode = &child
 		case EndTag:
-			currentNode = *findComplementaryOpenTag(&currentNode)
+			currentNode = findComplementaryOpenTag(currentNode, token.Name)
 		case CommentType:
 			//ignore
 		case Character:
