@@ -2,119 +2,110 @@ package main
 
 import (
 	"fmt"
+	"strings"
 )
 
+const endOfFile byte = byte(1)
+
 type HTMLTokenizer struct {
-	input []byte
-	curr  int
+	input            []byte
+	curr             int
+	state            State
+	lastStartTagName string
+	returnState      []State //a stack of return states, values are ints from enums State
+	tmpBuffer        strings.Builder
+	currToken        HTMLToken
 }
 
 //MAIN TOKENIZER FUNCTION
 
-func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
+func (tokenizer HTMLTokenizer) TokenizeHTML() []HTMLToken {
 
-	//var space
 	var tokens []HTMLToken
-	var state State = Data
-	var currToken HTMLToken
-	var endOfFile byte = byte(0)
-	var tmpBuffer string = ""
-	var lastStartTagName string = ""
-	var returnState []State //a stack of return states, values are ints from enums State
 
-	for token.curr < len(token.input) {
-		currVal := token.input[token.curr]
-		switch state {
+	for tokenizer.curr < len(tokenizer.input) {
+		currVal := tokenizer.input[tokenizer.curr]
+		switch tokenizer.state {
 		case Data:
 			switch currVal {
 			case ampersand:
-				state = CharacterReference
-				returnState = append(returnState, Data)
+				tokenizer.state = CharacterReference
+				tokenizer.returnState = append(tokenizer.returnState, Data)
 			case lesserThan:
-				state = TagOpen
+				if isNotWhitespace(tokenizer.currToken.Content.String()) {
+					tokenizer.currToken.Type = Character
+					emitCurrToken(&tokenizer.currToken, &tokens)
+				}
+				tokenizer.state = TagOpen
 			case null:
 				// Parse error
 				emitToken(HTMLToken{
 					Type:    Character,
-					Content: string(currVal),
+					Content: toBuilder(string(currVal)),
 				}, &tokens)
 			case endOfFile:
 				emitToken(HTMLToken{
 					Type: EOF,
 				}, &tokens)
 			default:
-				if !isNewline(currVal) {
-					emitToken(HTMLToken{
-						Type:    Character,
-						Content: string(currVal),
-					}, &tokens)
-				}
+				tokenizer.currToken.Content.WriteByte(currVal)
 			}
 
 		case RCDATA:
 			switch currVal {
 			case ampersand:
-				state = CharacterReference
-				returnState = append(returnState, RCDATA)
+				tokenizer.state = CharacterReference
+				tokenizer.returnState = append(tokenizer.returnState, RCDATA)
 			case lesserThan:
-				state = RCDATALessThanSign
+				tokenizer.state = RCDATALessThanSign
 			case null:
 				// Parse error
 				emitToken(HTMLToken{
 					Type:    Character,
-					Content: replacementChar,
+					Content: toBuilder(replacementChar),
 				}, &tokens)
 			case endOfFile:
 				emitToken(HTMLToken{
 					Type: EOF,
 				}, &tokens)
 			default:
-				emitToken(HTMLToken{
-					Type:    Character,
-					Content: string(currVal),
-				}, &tokens)
+				tokenizer.currToken.Content.WriteByte(currVal)
 			}
 
 		case RAWTEXT:
 			switch currVal {
 			case lesserThan:
-				state = RAWTEXTLessThanSign
+				tokenizer.state = RAWTEXTLessThanSign
 			case null:
 				// Parse error
 				emitToken(HTMLToken{
 					Type:    Character,
-					Content: replacementChar,
+					Content: toBuilder(replacementChar),
 				}, &tokens)
 			case endOfFile:
 				emitToken(HTMLToken{
 					Type: EOF,
 				}, &tokens)
 			default:
-				emitToken(HTMLToken{
-					Type:    Character,
-					Content: string(currVal),
-				}, &tokens)
+				tokenizer.currToken.Content.WriteByte(currVal)
 			}
 
 		case Script:
 			switch currVal {
 			case lesserThan:
-				state = ScriptDataLessThanSign
+				tokenizer.state = ScriptDataLessThanSign
 			case null:
 				// Parse error
 				emitToken(HTMLToken{
 					Type:    Character,
-					Content: replacementChar,
+					Content: toBuilder(replacementChar),
 				}, &tokens)
 			case endOfFile:
 				emitToken(HTMLToken{
 					Type: EOF,
 				}, &tokens)
 			default:
-				emitToken(HTMLToken{
-					Type:    Character,
-					Content: string(currVal),
-				}, &tokens)
+				tokenizer.tmpBuffer.WriteByte(currVal)
 			}
 
 		case PLAINTEXT:
@@ -123,34 +114,30 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 				// Parse error
 				emitToken(HTMLToken{
 					Type:    Character,
-					Content: replacementChar,
+					Content: toBuilder(replacementChar),
 				}, &tokens)
 			case endOfFile:
 				emitToken(HTMLToken{
 					Type: EOF,
 				}, &tokens)
 			default:
-				emitToken(HTMLToken{
-					Type:    Character,
-					Content: string(currVal),
-				}, &tokens)
+				tokenizer.tmpBuffer.WriteByte(currVal)
 			}
 
 		case TagOpen:
 			switch currVal {
 			case exclamationMark:
-				state = MarkupDeclarationOpen
+				tokenizer.state = MarkupDeclarationOpen
 			case solidus:
-				state = EndTagOpen
+				tokenizer.state = EndTagOpen
 			case questionMark:
 				// Parse Error
-				currToken.Type = CommentType
-				currToken.Content = ""
-				reconsume(&state, BogusComment, &token.curr)
+				tokenizer.currToken.Type = CommentType
+				reconsume(&tokenizer.state, BogusComment, &tokenizer.curr)
 			case endOfFile:
 				emitToken(HTMLToken{
 					Type:    Character,
-					Content: "<",
+					Content: toBuilder(string(rune(lesserThan))),
 				}, &tokens)
 				emitToken(HTMLToken{
 					Type: EOF,
@@ -159,18 +146,18 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 			default:
 				if isASCIIAlpha(currVal) {
 					// create a new start tag token
-					currToken.Type = StartTag
-					currToken.Name = ""
-					currToken.Attributes = []Attribute{}
-					currToken.SelfClosingFlag = false
-					reconsume(&state, TagName, &token.curr)
+					tokenizer.currToken.Type = StartTag
+					tokenizer.currToken.Name = ""
+					tokenizer.currToken.Attributes = []Attribute{}
+					tokenizer.currToken.SelfClosingFlag = false
+					reconsume(&tokenizer.state, TagName, &tokenizer.curr)
 				} else {
 					// Parse Error
 					emitToken(HTMLToken{
 						Type:    Character,
-						Content: "<",
+						Content: toBuilder(string(rune(lesserThan))),
 					}, &tokens)
-					reconsume(&state, Data, &token.curr)
+					reconsume(&tokenizer.state, Data, &tokenizer.curr)
 				}
 			}
 
@@ -178,16 +165,16 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 			switch currVal {
 			case greaterThan:
 				// Parse Error
-				state = Data
+				tokenizer.state = Data
 			case endOfFile:
 				//Parse Error
 				emitToken(HTMLToken{
 					Type:    Character,
-					Content: "<",
+					Content: toBuilder(string(rune(lesserThan))),
 				}, &tokens)
 				emitToken(HTMLToken{
 					Type:    Character,
-					Content: "/",
+					Content: toBuilder(string(rune(solidus))),
 				}, &tokens)
 				emitToken(HTMLToken{
 					Type: EOF,
@@ -195,34 +182,34 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 			default:
 				if isASCIIAlpha(currVal) {
 					// create a new end tag token
-					currToken.Type = EndTag
-					currToken.Name = ""
-					currToken.Attributes = []Attribute{}
-					currToken.SelfClosingFlag = false
-					reconsume(&state, TagName, &token.curr)
+					tokenizer.currToken.Type = EndTag
+					tokenizer.currToken.Name = ""
+					tokenizer.currToken.Attributes = []Attribute{}
+					tokenizer.currToken.SelfClosingFlag = false
+					reconsume(&tokenizer.state, TagName, &tokenizer.curr)
 				} else {
 					// Parse Error
-					currToken.Type = CommentType
-					currToken.Content = ""
-					reconsume(&state, BogusComment, &token.curr)
+					tokenizer.currToken.Type = CommentType
+					tokenizer.currToken.Content = strings.Builder{}
+					reconsume(&tokenizer.state, BogusComment, &tokenizer.curr)
 				}
 			}
 
 		case TagName:
 			switch currVal {
 			case tab, LF, FF, space:
-				state = BeforeAttributeName
+				tokenizer.state = BeforeAttributeName
 			case greaterThan:
-				state = Data
-				emitCurrToken(&currToken, &tokens)
-				if currToken.Type == StartTag {
-					lastStartTagName = currToken.Name
+				tokenizer.state = Data
+				emitCurrToken(&tokenizer.currToken, &tokens)
+				if tokenizer.currToken.Type == StartTag {
+					tokenizer.lastStartTagName = tokenizer.currToken.Name
 				}
 			case solidus:
-				state = SelfClosingStartTag
+				tokenizer.state = SelfClosingStartTag
 			case null: //null
 				// Parse error
-				currToken.Name += replacementChar
+				tokenizer.currToken.Name += replacementChar
 			case endOfFile:
 				emitToken(HTMLToken{
 					Type: EOF,
@@ -230,334 +217,264 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 
 			default:
 				if isUppercase(currVal) {
-					currToken.Name += string(currVal + 0x20)
+					tokenizer.currToken.Name += string(currVal + 0x20)
 				} else {
-					currToken.Name += string(currVal)
+					tokenizer.currToken.Name += string(currVal)
 				}
 			}
 
 		case RCDATALessThanSign:
 			switch currVal {
 			case solidus:
-				state = RCDATAEndTagOpen
-				tmpBuffer = ""
+				tokenizer.state = RCDATAEndTagOpen
+				tokenizer.tmpBuffer = strings.Builder{}
 			default:
-				emitToken(HTMLToken{
-					Type:    Character,
-					Content: "<",
-				}, &tokens)
-				reconsume(&state, RCDATA, &token.curr)
+				tokenizer.tmpBuffer.WriteByte(lesserThan)
+				reconsume(&tokenizer.state, RCDATA, &tokenizer.curr)
 			}
 
 		case RCDATAEndTagOpen:
 			// All reconsumed
 			if isASCIIAlpha(currVal) {
-				currToken.Type = EndTag
-				currToken.Name = ""
-				state = RCDATAEndTagName
+				tokenizer.currToken.Type = EndTag
+				tokenizer.currToken.Name = ""
+				tokenizer.state = RCDATAEndTagName
 			} else {
-				emitToken(HTMLToken{
-					Type:    Character,
-					Content: "<",
-				}, &tokens)
-				emitToken(HTMLToken{
-					Type:    Character,
-					Content: "/",
-				}, &tokens)
+				tokenizer.tmpBuffer.WriteByte(lesserThan)
+				tokenizer.tmpBuffer.WriteByte(solidus)
 			}
-			token.curr--
+			tokenizer.curr--
 
 		case RCDATAEndTagName:
 
 			if currVal == tab || currVal == LF || currVal == FF {
 				//ignore whitespace
-			} else if currVal == space && lastStartTagName == currToken.Name {
-				state = BeforeAttributeName
-			} else if currVal == greaterThan && lastStartTagName == currToken.Name {
-				state = Data
-				emitCurrToken(&currToken, &tokens)
-			} else if currVal == solidus && lastStartTagName == currToken.Name {
-				state = SelfClosingStartTag
+			} else if currVal == space && tokenizer.lastStartTagName == tokenizer.currToken.Name {
+				tokenizer.state = BeforeAttributeName
+			} else if currVal == greaterThan && tokenizer.lastStartTagName == tokenizer.currToken.Name {
+				tokenizer.state = Data
+				emitCurrToken(&tokenizer.currToken, &tokens)
+			} else if currVal == solidus && tokenizer.lastStartTagName == tokenizer.currToken.Name {
+				tokenizer.state = SelfClosingStartTag
 			} else if isUppercase(currVal) {
-				currToken.Name += currToken.Name + string(currVal+0x20)
-				tmpBuffer += string(currVal + 0x20)
+				tokenizer.currToken.Name += tokenizer.currToken.Name + string(currVal+0x20)
+				tokenizer.tmpBuffer.WriteByte(currVal + 0x20)
 			} else if isLowercase(currVal) {
 				//reconsume in RCDATA state
-				tmpBuffer += string(currVal)
-				currToken.Name = currToken.Name + string(currVal)
+				tokenizer.tmpBuffer.WriteByte(currVal)
+				tokenizer.currToken.Name = tokenizer.currToken.Name + string(currVal)
 			} else {
-				//emit current tag token
-				emitToken(HTMLToken{
-					Type:    Character,
-					Content: "<", // LESS-THAN SIGN
-				}, &tokens)
-				emitToken(HTMLToken{
-					Type:    Character,
-					Content: "/", // Solidus
-				}, &tokens)
-				// emit a token for each char in tmpBuffer
-				for _, char := range tmpBuffer {
-					emitToken(HTMLToken{
-						Type:    Character,
-						Content: string(char),
-					}, &tokens)
-				}
-				reconsume(&state, RCDATA, &token.curr)
+				tokenizer.tmpBuffer.WriteByte(lesserThan)
+				tokenizer.tmpBuffer.WriteByte(solidus)
+
+				tokenizer.currToken.Content = tokenizer.tmpBuffer
+				emitCurrToken(&tokenizer.currToken, &tokens)
+				reconsume(&tokenizer.state, RCDATA, &tokenizer.curr)
 			}
 
 		case RAWTEXTLessThanSign:
 			switch currVal {
 			case solidus: //SOLIDUS
-				state = RAWTEXTEndTagOpen
-				tmpBuffer = ""
+				tokenizer.state = RAWTEXTEndTagOpen
+				tokenizer.tmpBuffer = strings.Builder{}
 			default:
-				emitToken(HTMLToken{
-					Type:    Character,
-					Content: "<", // LESS-THAN SIGN
-				}, &tokens)
+				tokenizer.tmpBuffer.WriteByte(lesserThan)
 				//Reconsume in RAWTEXT state
-				reconsume(&state, RAWTEXT, &token.curr)
+				reconsume(&tokenizer.state, RAWTEXT, &tokenizer.curr)
 			}
 
 		case RAWTEXTEndTagOpen:
 			// All reconsumed
 			if isASCIIAlpha(currVal) {
-				currToken.Type = EndTag
-				currToken.Name = ""
-				state = RAWTEXTEndTagName
+				tokenizer.currToken.Type = EndTag
+				tokenizer.currToken.Name = ""
+				tokenizer.state = RAWTEXTEndTagName
 			} else {
-				emitToken(HTMLToken{
-					Type:    Character,
-					Content: "<", // LESS-THAN SIGN
-				}, &tokens)
-				emitToken(HTMLToken{
-					Type:    Character,
-					Content: "/", // SOLIDUS
-				}, &tokens)
+				tokenizer.tmpBuffer.WriteByte(lesserThan)
+				tokenizer.tmpBuffer.WriteByte(solidus)
 				//Reconsume in the RAWTEXT state
-				state = RAWTEXT
+				tokenizer.state = RAWTEXT
 			}
-			token.curr--
+			tokenizer.curr--
 
 		case RAWTEXTEndTagName:
 
 			if currVal == tab || currVal == LF || currVal == FF { //tab, LF, FF
 				//ignore whitespace
-			} else if currVal == space && lastStartTagName == currToken.Name {
-				state = BeforeAttributeName
-			} else if currVal == greaterThan && lastStartTagName == currToken.Name {
-				state = Data
-				emitCurrToken(&currToken, &tokens)
-			} else if currVal == solidus && lastStartTagName == currToken.Name {
-				state = SelfClosingStartTag
+			} else if currVal == space && tokenizer.lastStartTagName == tokenizer.currToken.Name {
+				tokenizer.state = BeforeAttributeName
+			} else if currVal == greaterThan && tokenizer.lastStartTagName == tokenizer.currToken.Name {
+				tokenizer.state = Data
+				emitCurrToken(&tokenizer.currToken, &tokens)
+			} else if currVal == solidus && tokenizer.lastStartTagName == tokenizer.currToken.Name {
+				tokenizer.state = SelfClosingStartTag
 			} else if isUppercase(currVal) {
-				currToken.Name += currToken.Name + string(currVal+0x20)
-				tmpBuffer += string(currVal + 0x20)
+				tokenizer.currToken.Name += tokenizer.currToken.Name + string(currVal+0x20)
+				tokenizer.tmpBuffer.WriteByte(currVal + 0x20)
 			} else if isLowercase(currVal) {
-				currToken.Name += currToken.Name + string(currVal)
-				tmpBuffer += string(currVal)
+				tokenizer.currToken.Name += tokenizer.currToken.Name + string(currVal)
+				tokenizer.tmpBuffer.WriteByte(currVal)
 			} else {
-				emitToken(HTMLToken{
-					Type:    Character,
-					Content: "<", // LESS-THAN SIGN
-				}, &tokens)
-				emitToken(HTMLToken{
-					Type:    Character,
-					Content: "/", // SOLIDUS
-				}, &tokens)
-				// emit a token for each char in tmpBuffer
-				for _, char := range tmpBuffer {
-					emitToken(HTMLToken{
-						Type:    Character,
-						Content: string(char),
-					}, &tokens)
-				}
-				// Reconsume in the RAWTEXT state
-				reconsume(&state, RAWTEXT, &token.curr)
+				tokenizer.tmpBuffer.WriteByte(lesserThan)
+				tokenizer.tmpBuffer.WriteByte(solidus)
+
+				tokenizer.currToken.Content = tokenizer.tmpBuffer
+				emitCurrToken(&tokenizer.currToken, &tokens)
+				reconsume(&tokenizer.state, RAWTEXT, &tokenizer.curr)
 			}
 
 		case ScriptDataLessThanSign:
 			// All reconsumed
 
 			if isUppercase(currVal) {
-				currToken.Type = EndTag
-				currToken.Name = ""
+				tokenizer.currToken.Type = EndTag
+				tokenizer.currToken.Name = ""
 			} else {
-				emitToken(HTMLToken{
-					Type:    Character,
-					Content: "<", // LESS-THAN SIGN
-				}, &tokens)
-				emitToken(HTMLToken{
-					Type:    Character,
-					Content: "/", // SOLIDUS
-				}, &tokens)
+				tokenizer.tmpBuffer.WriteByte(lesserThan)
+				tokenizer.tmpBuffer.WriteByte(solidus)
 				//Reconsume in the Script data state
-				state = Script
+				tokenizer.state = Script
 			}
-			token.curr--
+			tokenizer.curr--
 
 		case ScriptDataEndTagName:
 
 			if currVal == tab || currVal == LF || currVal == FF {
 				//ingore whitespace
-			} else if currVal == space && currToken.Name == lastStartTagName {
-				state = SelfClosingStartTag
-			} else if currVal == greaterThan && currToken.Name == lastStartTagName {
-				state = Data
-				emitCurrToken(&currToken, &tokens)
+			} else if currVal == space && tokenizer.currToken.Name == tokenizer.lastStartTagName {
+				tokenizer.state = SelfClosingStartTag
+			} else if currVal == greaterThan && tokenizer.currToken.Name == tokenizer.lastStartTagName {
+				tokenizer.state = Data
+				emitCurrToken(&tokenizer.currToken, &tokens)
 			} else if isUppercase(currVal) {
-				currToken.Name = currToken.Name + string(currVal+space)
-				tmpBuffer = tmpBuffer + string(currVal)
+				tokenizer.currToken.Name = tokenizer.currToken.Name + string(currVal+space)
+				tokenizer.tmpBuffer.WriteByte(currVal)
 			} else if isLowercase(currVal) {
-				currToken.Name = currToken.Name + string(currVal)
-				tmpBuffer = tmpBuffer + string(currVal)
+				tokenizer.currToken.Name = tokenizer.currToken.Name + string(currVal)
+				tokenizer.tmpBuffer.WriteByte(currVal)
 			} else {
-				emitToken(HTMLToken{
-					Type:    Character,
-					Content: "<",
-				}, &tokens)
-				emitToken(HTMLToken{
-					Type:    Character,
-					Content: "/",
-				}, &tokens)
-				for _, char := range tmpBuffer {
-					emitToken(HTMLToken{
-						Type:    Character,
-						Content: string(char),
-					}, &tokens)
-				}
-				reconsume(&state, Script, &token.curr)
+				tokenizer.tmpBuffer.WriteByte(lesserThan)
+				tokenizer.tmpBuffer.WriteByte(solidus)
+
+				tokenizer.currToken.Content = tokenizer.tmpBuffer
+				emitCurrToken(&tokenizer.currToken, &tokens)
+				reconsume(&tokenizer.state, Script, &tokenizer.curr)
 			}
 
-		case ScriptDataEscapeStart:
+		case ScriptDataEscaped:
 			switch currVal {
-			case dash: //'-'
-				state = ScriptDataEscapeStartDash
+			case lesserThan:
+				tokenizer.state = ScriptDataDoubleEscapedLessThanSign
+			case dash:
+				tokenizer.state = ScriptDataEscapedDash
+			case null:
 				emitToken(HTMLToken{
 					Type:    Character,
-					Content: "-",
+					Content: toBuilder(replacementChar),
+				}, &tokens)
+			case endOfFile:
+				emitToken(HTMLToken{
+					Type: EOF,
 				}, &tokens)
 			default:
+				tokenizer.tmpBuffer.WriteByte(currVal)
+			}
+
+		case ScriptDataEscapedDash:
+			switch currVal {
+			case dash: //'-'
+				tokenizer.state = ScriptDataEscapeStartDash
+				tokenizer.tmpBuffer.WriteByte(dash)
+			default:
 				//Reconsume in the script data state
-				reconsume(&state, Script, &token.curr)
+				reconsume(&tokenizer.state, Script, &tokenizer.curr)
 			}
 
 		case ScriptDataEscapeStartDash:
 			switch currVal {
 			case dash: //'-'
-				state = ScriptDataEscapeStartDash
-				emitToken(HTMLToken{
-					Type:    Character,
-					Content: "-",
-				}, &tokens)
+				tokenizer.state = ScriptDataEscapeStartDash
+				tokenizer.tmpBuffer.WriteByte(dash)
 			default:
 				//Reconsume in the script data state
-				reconsume(&state, Script, &token.curr)
+				reconsume(&tokenizer.state, Script, &tokenizer.curr)
 			}
 
 		case ScriptDataEscapedDashDash:
 			switch currVal {
 			case dash: //'-'
-				emitToken(HTMLToken{
-					Type:    Character,
-					Content: "-",
-				}, &tokens)
+				tokenizer.tmpBuffer.WriteByte(dash)
 			case lesserThan: //"<"
-				state = ScriptDataEscapedLessThanSign
+				tokenizer.state = ScriptDataEscapedLessThanSign
 			case greaterThan: //">"
-				state = Script
-				emitToken(HTMLToken{
-					Type:    Character,
-					Content: ">",
-				}, &tokens)
+				tokenizer.state = Script
+				tokenizer.tmpBuffer.WriteByte(greaterThan)
 			case null:
 				//Parse error
-				state = ScriptDataEscaped
+				tokenizer.state = ScriptDataEscaped
 				emitToken(HTMLToken{
 					Type:    Character,
-					Content: replacementChar,
+					Content: toBuilder(replacementChar),
 				}, &tokens)
 			case endOfFile:
 				// Parse error
-				state = ScriptDataEscaped
+				tokenizer.state = ScriptDataEscaped
 				emitToken(HTMLToken{
 					Type: EOF,
 				}, &tokens)
 			default:
-				state = ScriptDataEscaped
-				emitToken(HTMLToken{
-					Type:    Character,
-					Content: string(currVal),
-				}, &tokens)
+				tokenizer.state = ScriptDataEscaped
+				tokenizer.currToken.Content.WriteByte(currVal)
 			}
 
 		case ScriptDataEscapedLessThanSign:
 
 			if currVal == solidus {
-				tmpBuffer = ""
-				state = ScriptDataEscapedEndTagOpen
+				tokenizer.tmpBuffer.Reset()
+				tokenizer.state = ScriptDataEscapedEndTagOpen
 			} else if isASCIIAlpha(currVal) {
-				tmpBuffer = ""
-				emitToken(HTMLToken{
-					Type:    Character,
-					Content: "<",
-				}, &tokens)
-				reconsume(&state, ScriptDataEscaped, &token.curr)
+				tokenizer.tmpBuffer.Reset()
+				tokenizer.tmpBuffer.WriteByte(lesserThan)
+				reconsume(&tokenizer.state, ScriptDataEscaped, &tokenizer.curr)
 			}
 
 		case ScriptDataEscapedEndTagOpen:
 			// All reconsumed
 			if isASCIIAlpha(currVal) {
-				currToken.Type = EndTag
-				currToken.Name = ""
-				state = ScriptDataEscapedEndTagName
+				tokenizer.currToken.Type = EndTag
+				tokenizer.currToken.Name = ""
+				tokenizer.state = ScriptDataEscapedEndTagName
 			} else {
-				emitToken(HTMLToken{
-					Type:    Character,
-					Content: "<",
-				}, &tokens)
-				emitToken(HTMLToken{
-					Type:    Character,
-					Content: "/",
-				}, &tokens)
-				state = ScriptDataEscaped
+				tokenizer.tmpBuffer.WriteByte(lesserThan)
+				tokenizer.tmpBuffer.WriteByte(solidus)
+				tokenizer.state = ScriptDataEscaped
 			}
-			token.curr--
+			tokenizer.curr--
 
 		case ScriptDataEscapedEndTagName:
 
 			if currVal == tab || currVal == LF || currVal == FF {
 				//ignore whitespace
-			} else if currVal == space && currToken.Name == lastStartTagName {
-				state = BeforeAttributeName
-			} else if currVal == solidus && currToken.Name == lastStartTagName {
-				state = SelfClosingStartTag
-			} else if currVal == greaterThan && currToken.Name == lastStartTagName {
-				state = Data
-				emitCurrToken(&currToken, &tokens)
+			} else if currVal == space && tokenizer.currToken.Name == tokenizer.lastStartTagName {
+				tokenizer.state = BeforeAttributeName
+			} else if currVal == solidus && tokenizer.currToken.Name == tokenizer.lastStartTagName {
+				tokenizer.state = SelfClosingStartTag
+			} else if currVal == greaterThan && tokenizer.currToken.Name == tokenizer.lastStartTagName {
+				tokenizer.state = Data
+				emitCurrToken(&tokenizer.currToken, &tokens)
 			} else if isUppercase(currVal) {
-				currToken.Name += string(currVal + space)
-				tmpBuffer += string(currVal)
+				tokenizer.currToken.Name += string(currVal + space)
+				tokenizer.tmpBuffer.WriteByte(currVal)
 			} else if isLowercase(currVal) {
-				currToken.Name += string(currVal)
-				tmpBuffer += string(currVal)
+				tokenizer.currToken.Name += string(currVal)
+				tokenizer.tmpBuffer.WriteByte(currVal)
 			} else {
-				emitToken(HTMLToken{
-					Type:    Character,
-					Content: "<",
-				}, &tokens)
-				emitToken(HTMLToken{
-					Type:    Character,
-					Content: "/",
-				}, &tokens)
-				for _, val := range tmpBuffer {
-					emitToken(HTMLToken{
-						Type:    Character,
-						Content: string(val),
-					}, &tokens)
-				}
+				tokenizer.tmpBuffer.WriteString("</")
+
+				tokenizer.currToken.Content = tokenizer.tmpBuffer
+				emitCurrToken(&tokenizer.currToken, &tokens)
 				//Reconsume
-				reconsume(&state, ScriptDataEscaped, &token.curr)
+				reconsume(&tokenizer.state, ScriptDataEscaped, &tokenizer.curr)
 			}
 
 		case ScriptDataDoubleEscapeStart:
@@ -566,52 +483,38 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 				currVal == FF || currVal == space || currVal == solidus {
 				//ignore whitespace
 			} else if currVal == greaterThan {
-				if tmpBuffer == "script" {
-					state = ScriptDataDoubleEscaped
+				if tokenizer.tmpBuffer.String() == "script" {
+					tokenizer.state = ScriptDataDoubleEscaped
 				} else {
-					state = ScriptDataEscaped
+					tokenizer.state = ScriptDataEscaped
 				}
-				emitToken(HTMLToken{
-					Type:    Character,
-					Content: string(currVal),
-				}, &tokens)
+				tokenizer.tmpBuffer.WriteByte(currVal)
 
 			} else if isUppercase(currVal) {
-				tmpBuffer += string(currVal + space)
-				emitToken(HTMLToken{
-					Type:    Character,
-					Content: string(currVal),
-				}, &tokens)
+				tokenizer.tmpBuffer.WriteByte(currVal)
+				tokenizer.tmpBuffer.WriteByte(space)
+
 			} else if isLowercase(currVal) {
-				tmpBuffer += string(currVal + space)
-				emitToken(HTMLToken{
-					Type:    Character,
-					Content: string(currVal),
-				}, &tokens)
+				tokenizer.tmpBuffer.WriteByte(currVal)
+				tokenizer.tmpBuffer.WriteByte(space)
 			} else {
 				//Reconsume
-				reconsume(&state, ScriptDataEscaped, &token.curr)
+				reconsume(&tokenizer.state, ScriptDataEscaped, &tokenizer.curr)
 			}
 
 		case ScriptDataDoubleEscaped:
 			switch currVal {
 			case dash: // '-'
-				state = ScriptDataDoubleEscapedDash
-				emitToken(HTMLToken{
-					Type:    Character,
-					Content: "-",
-				}, &tokens)
+				tokenizer.state = ScriptDataDoubleEscapedDash
+				tokenizer.tmpBuffer.WriteByte(dash)
 			case lesserThan: //<
-				state = ScriptDataDoubleEscapedLessThanSign
-				emitToken(HTMLToken{
-					Type:    Character,
-					Content: "<",
-				}, &tokens)
+				tokenizer.state = ScriptDataDoubleEscapedLessThanSign
+				tokenizer.tmpBuffer.WriteByte(lesserThan)
 			case null: //null
 				// Parse error
 				emitToken(HTMLToken{
 					Type:    Character,
-					Content: replacementChar,
+					Content: toBuilder(replacementChar),
 				}, &tokens)
 			case endOfFile:
 				// Parse error
@@ -623,61 +526,43 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 		case ScriptDataDoubleEscapedDash:
 			switch currVal {
 			case dash: // '-'
-				state = ScriptDataDoubleEscapedDashDash
-				emitToken(HTMLToken{
-					Type:    Character,
-					Content: "-",
-				}, &tokens)
+				tokenizer.state = ScriptDataDoubleEscapedDashDash
+				tokenizer.tmpBuffer.WriteByte(dash)
 			case lesserThan: // <
-				state = ScriptDataDoubleEscapedLessThanSign
-				emitToken(HTMLToken{
-					Type:    Character,
-					Content: "<",
-				}, &tokens)
+				tokenizer.state = ScriptDataDoubleEscapedLessThanSign
+				tokenizer.tmpBuffer.WriteByte(lesserThan)
 			case null: // null
 				//Parse error
-				state = ScriptDataDoubleEscaped
+				tokenizer.state = ScriptDataDoubleEscaped
 				emitToken(HTMLToken{
 					Type:    Character,
-					Content: replacementChar,
+					Content: toBuilder(replacementChar),
 				}, &tokens)
 			case endOfFile:
 				emitToken(HTMLToken{
 					Type: EOF,
 				}, &tokens)
 			default:
-				state = ScriptDataDoubleEscaped
-				emitToken(HTMLToken{
-					Type:    Character,
-					Content: string(currVal),
-				}, &tokens)
+				tokenizer.state = ScriptDataDoubleEscaped
+				tokenizer.tmpBuffer.WriteByte(currVal)
 			}
 
 		case ScriptDataDoubleEscapedDashDash:
 			switch currVal {
 			case dash: // '-'
-				emitToken(HTMLToken{
-					Type:    Character,
-					Content: "-",
-				}, &tokens)
+				tokenizer.tmpBuffer.WriteByte(dash)
 			case lesserThan: //'<'
-				state = ScriptDataDoubleEscapedLessThanSign
-				emitToken(HTMLToken{
-					Type:    Character,
-					Content: "<",
-				}, &tokens)
+				tokenizer.state = ScriptDataDoubleEscapedLessThanSign
+				tokenizer.tmpBuffer.WriteByte(lesserThan)
 			case greaterThan: //'>'
-				state = Script
-				emitToken(HTMLToken{
-					Type:    Character,
-					Content: ">",
-				}, &tokens)
+				tokenizer.state = Script
+				tokenizer.tmpBuffer.WriteByte(greaterThan)
 			case null: //null
 				//Parse error
-				state = ScriptDataDoubleEscaped
+				tokenizer.state = ScriptDataDoubleEscaped
 				emitToken(HTMLToken{
 					Type:    Character,
-					Content: replacementChar,
+					Content: toBuilder(replacementChar),
 				}, &tokens)
 			case endOfFile:
 				//Parse error
@@ -685,23 +570,17 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 					Type: EOF,
 				}, &tokens)
 			default:
-				state = ScriptDataDoubleEscaped
-				emitToken(HTMLToken{
-					Type:    Character,
-					Content: string(currVal),
-				}, &tokens)
+				tokenizer.state = ScriptDataDoubleEscaped
+				tokenizer.tmpBuffer.WriteByte(currVal)
 			}
 
 		case ScriptDataDoubleEscapedLessThanSign:
 			if currVal == solidus {
-				tmpBuffer = ""
-				state = ScriptDataDoubleEscapeEnd
-				emitToken(HTMLToken{
-					Type:    Character,
-					Content: "/",
-				}, &tokens)
+				tokenizer.tmpBuffer.Reset()
+				tokenizer.state = ScriptDataDoubleEscapeEnd
+				tokenizer.tmpBuffer.WriteByte(solidus)
 			} else {
-				reconsume(&state, ScriptDataDoubleEscaped, &token.curr)
+				reconsume(&tokenizer.state, ScriptDataDoubleEscaped, &tokenizer.curr)
 			}
 
 		case ScriptDataDoubleEscapeEnd:
@@ -710,30 +589,20 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 				currVal == space || currVal == solidus {
 				//ignore whitespace
 			} else if currVal == greaterThan {
-				if tmpBuffer == "script" {
-					state = ScriptDataEscaped
+				if tokenizer.tmpBuffer.String() == "script" {
+					tokenizer.state = ScriptDataEscaped
 				} else {
-					state = ScriptDataDoubleEscaped
+					tokenizer.state = ScriptDataDoubleEscaped
 				}
-				emitToken(HTMLToken{
-					Type:    Character,
-					Content: string(currVal),
-				}, &tokens)
+				tokenizer.tmpBuffer.WriteByte(currVal)
 			} else if isUppercase(currVal) {
-				tmpBuffer += string(currVal + space)
-				emitToken(HTMLToken{
-					Type:    Character,
-					Content: string(currVal),
-				}, &tokens)
+				tokenizer.tmpBuffer.WriteByte(currVal)
+				tokenizer.tmpBuffer.WriteByte(space)
 			} else if isLowercase(currVal) {
-				tmpBuffer += string(currVal)
-				emitToken(HTMLToken{
-					Type:    Character,
-					Content: string(currVal),
-				}, &tokens)
+				tokenizer.tmpBuffer.WriteByte(currVal)
 			} else {
 				//Reconsume
-				reconsume(&state, ScriptDataDoubleEscaped, &token.curr)
+				reconsume(&tokenizer.state, ScriptDataDoubleEscaped, &tokenizer.curr)
 			}
 
 		case BeforeAttributeName:
@@ -741,51 +610,51 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 			case tab, LF, FF, space:
 				//ignore
 			case greaterThan, solidus, endOfFile:
-				reconsume(&state, AfterAttributeName, &token.curr)
+				reconsume(&tokenizer.state, AfterAttributeName, &tokenizer.curr)
 			case equal: // '='
 				//Parse error
-				currToken.Attributes = append(currToken.Attributes, Attribute{
+				tokenizer.currToken.Attributes = append(tokenizer.currToken.Attributes, Attribute{
 					Name:  string(currVal),
 					Value: "",
 				})
-				state = AttributeName
+				tokenizer.state = AttributeName
 			default:
-				currToken.Attributes = append(currToken.Attributes, Attribute{
+				tokenizer.currToken.Attributes = append(tokenizer.currToken.Attributes, Attribute{
 					Name:  "",
 					Value: "",
 				})
-				reconsume(&state, AttributeName, &token.curr)
+				reconsume(&tokenizer.state, AttributeName, &tokenizer.curr)
 			}
 
 		case AttributeName:
 			switch currVal {
 			case tab, LF, FF, space, solidus, greaterThan: //whitespace, '/' or '>'
 			case endOfFile:
-				reconsume(&state, AfterAttributeName, &token.curr)
+				reconsume(&tokenizer.state, AfterAttributeName, &tokenizer.curr)
 			case equal:
-				state = BeforeAttributeValue
+				tokenizer.state = BeforeAttributeValue
 			case null:
 				//Parse error
-				idx := len(currToken.Attributes) - 1
-				currToken.Attributes[idx].Name = currToken.Attributes[idx].Name + replacementChar
+				idx := len(tokenizer.currToken.Attributes) - 1
+				tokenizer.currToken.Attributes[idx].Name = tokenizer.currToken.Attributes[idx].Name + replacementChar
 			default:
 				if isUppercase(currVal) {
-					idx := len(currToken.Attributes) - 1
-					currToken.Attributes[idx].Name = currToken.Attributes[idx].Name + string(currVal+space)
+					idx := len(tokenizer.currToken.Attributes) - 1
+					tokenizer.currToken.Attributes[idx].Name = tokenizer.currToken.Attributes[idx].Name + string(currVal+space)
 				} else {
-					idx := len(currToken.Attributes) - 1
-					currToken.Attributes[idx].Name = currToken.Attributes[idx].Name + string(currVal)
+					idx := len(tokenizer.currToken.Attributes) - 1
+					tokenizer.currToken.Attributes[idx].Name = tokenizer.currToken.Attributes[idx].Name + string(currVal)
 				}
 			}
 
 			//Checking duplicates
-			if state != AttributeName {
+			if tokenizer.state != AttributeName {
 				// Can be faster by counting occurences in a map, relying on not so many attributes
-				for i := 0; i < len(currToken.Attributes); i++ {
-					for j := i + 1; j < len(currToken.Attributes); j++ {
-						if currToken.Attributes[i].Name == currToken.Attributes[j].Name {
+				for i := 0; i < len(tokenizer.currToken.Attributes); i++ {
+					for j := i + 1; j < len(tokenizer.currToken.Attributes); j++ {
+						if tokenizer.currToken.Attributes[i].Name == tokenizer.currToken.Attributes[j].Name {
 							//Parse error, remove duplicate
-							currToken.Attributes = append(currToken.Attributes[:j], currToken.Attributes[j+1:]...)
+							tokenizer.currToken.Attributes = append(tokenizer.currToken.Attributes[:j], tokenizer.currToken.Attributes[j+1:]...)
 						}
 					}
 				}
@@ -795,303 +664,308 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 			switch currVal {
 			case tab, LF, FF, space: //whitespace
 			case solidus: // '/'
-				state = SelfClosingStartTag
+				tokenizer.state = SelfClosingStartTag
 			case equal: // '='
-				state = BeforeAttributeValue
+				tokenizer.state = BeforeAttributeValue
 			case greaterThan: // '>'
-				state = Data
-				emitCurrToken(&currToken, &tokens)
+				tokenizer.state = Data
+				emitCurrToken(&tokenizer.currToken, &tokens)
 			case endOfFile:
 				//Parse Error
 				emitToken(HTMLToken{
 					Type: EOF,
 				}, &tokens)
 			default:
-				currToken.Attributes = append(currToken.Attributes, Attribute{
+				tokenizer.currToken.Attributes = append(tokenizer.currToken.Attributes, Attribute{
 					Name:  "",
 					Value: "",
 				})
-				reconsume(&state, AttributeName, &token.curr)
+				reconsume(&tokenizer.state, AttributeName, &tokenizer.curr)
 			}
 
 		case BeforeAttributeValue:
 			switch currVal {
 			case tab, LF, FF, space: //whitespace
 			case quoteMark: // '"'
-				state = AttributeValueDoubleQuoted
+				tokenizer.state = AttributeValueDoubleQuoted
 			case apostrophe: // '\''
-				state = AttributeValueSingleQuoted
+				tokenizer.state = AttributeValueSingleQuoted
 			case greaterThan: //">"
 				//Parse error, missing attribute
-				state = Data
-				emitCurrToken(&currToken, &tokens)
+				tokenizer.state = Data
+				emitCurrToken(&tokenizer.currToken, &tokens)
 			default:
-				reconsume(&state, AttributeValueUnquoted, &token.curr)
+				reconsume(&tokenizer.state, AttributeValueUnquoted, &tokenizer.curr)
 			}
 
 		case AttributeValueDoubleQuoted:
 			switch currVal {
 			case quoteMark: //'"'
-				state = AfterAttributeValueQuoted
+				tokenizer.state = AfterAttributeValueQuoted
 			case ampersand: //'&'
-				returnState = append(returnState, AttributeValueDoubleQuoted)
-				state = CharacterReference
+				tokenizer.returnState = append(tokenizer.returnState, AttributeValueDoubleQuoted)
+				tokenizer.state = CharacterReference
 			case null:
 				//Parse error
-				idx := len(currToken.Attributes) - 1
-				currToken.Attributes[idx].Value = currToken.Attributes[idx].Value + replacementChar
+				idx := len(tokenizer.currToken.Attributes) - 1
+				tokenizer.currToken.Attributes[idx].Value = tokenizer.currToken.Attributes[idx].Value + replacementChar
 			case endOfFile:
 				emitToken(HTMLToken{
 					Type: EOF,
 				}, &tokens)
 			default:
-				idx := len(currToken.Attributes) - 1
-				currToken.Attributes[idx].Value += string(currVal)
+				idx := len(tokenizer.currToken.Attributes) - 1
+				tokenizer.currToken.Attributes[idx].Value += string(currVal)
 			}
 
 		case AttributeValueSingleQuoted:
 			switch currVal {
 			case apostrophe: //'
-				state = AfterAttributeValueQuoted
+				tokenizer.state = AfterAttributeValueQuoted
 			case ampersand: //	"&"
-				returnState = append(returnState, AttributeValueSingleQuoted)
-				state = CharacterReference
+				tokenizer.returnState = append(tokenizer.returnState, AttributeValueSingleQuoted)
+				tokenizer.state = CharacterReference
 			case null: //null
 				//Parse error
-				idx := len(currToken.Attributes) - 1
-				currToken.Attributes[idx].Value = currToken.Attributes[idx].Value + replacementChar
+				idx := len(tokenizer.currToken.Attributes) - 1
+				tokenizer.currToken.Attributes[idx].Value = tokenizer.currToken.Attributes[idx].Value + replacementChar
 			case endOfFile:
 				emitToken(HTMLToken{
 					Type: EOF,
 				}, &tokens)
 			default:
-				idx := len(currToken.Attributes) - 1
-				currToken.Attributes[idx].Value = currToken.Attributes[idx].Value + string(currVal)
+				idx := len(tokenizer.currToken.Attributes) - 1
+				tokenizer.currToken.Attributes[idx].Value = tokenizer.currToken.Attributes[idx].Value + string(currVal)
 			}
 
 		case AttributeValueUnquoted:
 			switch currVal {
 			case tab, LF, FF, space: //whitespace
-				state = BeforeAttributeName
+				tokenizer.state = BeforeAttributeName
 			case ampersand:
-				returnState = append(returnState, AttributeValueUnquoted)
-				state = CharacterReference
+				tokenizer.returnState = append(tokenizer.returnState, AttributeValueUnquoted)
+				tokenizer.state = CharacterReference
 			case greaterThan:
-				state = Data
-				emitCurrToken(&currToken, &tokens)
+				tokenizer.state = Data
+				emitCurrToken(&tokenizer.currToken, &tokens)
 			case null:
 				//Parse error
-				idx := len(currToken.Attributes) - 1
-				currToken.Attributes[idx].Value = currToken.Attributes[idx].Value + replacementChar
+				idx := len(tokenizer.currToken.Attributes) - 1
+				tokenizer.currToken.Attributes[idx].Value = tokenizer.currToken.Attributes[idx].Value + replacementChar
 			case endOfFile:
 				emitToken(HTMLToken{
 					Type: EOF,
 				}, &tokens)
 			default:
-				idx := len(currToken.Attributes) - 1
-				currToken.Attributes[idx].Value = currToken.Attributes[idx].Value + replacementChar
+				idx := len(tokenizer.currToken.Attributes) - 1
+				tokenizer.currToken.Attributes[idx].Value = tokenizer.currToken.Attributes[idx].Value + replacementChar
 			}
 
 		case AfterAttributeValueQuoted:
 			switch currVal {
 			case tab, LF, FF, space:
-				state = BeforeAttributeName
+				tokenizer.state = BeforeAttributeName
 			case solidus:
-				state = SelfClosingStartTag
+				tokenizer.state = SelfClosingStartTag
 			case greaterThan:
-				state = Data
-				emitCurrToken(&currToken, &tokens)
+				tokenizer.state = Data
+				emitCurrToken(&tokenizer.currToken, &tokens)
 			case endOfFile:
 				emitToken(HTMLToken{
 					Type: EOF,
 				}, &tokens)
 			default:
 				//Reconsume
-				reconsume(&state, BeforeAttributeName, &token.curr)
+				reconsume(&tokenizer.state, BeforeAttributeName, &tokenizer.curr)
 			}
 
 		case SelfClosingStartTag:
 			switch currVal {
 			case greaterThan:
-				currToken.SelfClosingFlag = true
-				state = Data
-				emitCurrToken(&currToken, &tokens)
+				tokenizer.currToken.SelfClosingFlag = true
+				tokenizer.state = Data
+				emitCurrToken(&tokenizer.currToken, &tokens)
 			case endOfFile:
 				emitToken(HTMLToken{
 					Type: EOF,
 				}, &tokens)
 			default:
 				//Reconsume
-				reconsume(&state, BeforeAttributeName, &token.curr)
+				reconsume(&tokenizer.state, BeforeAttributeName, &tokenizer.curr)
 			}
 
 		case BogusComment:
 			switch currVal {
 			case greaterThan:
-				state = Data
-				emitCurrToken(&currToken, &tokens)
+				tokenizer.state = Data
+				emitCurrToken(&tokenizer.currToken, &tokens)
 			case endOfFile:
-				emitCurrToken(&currToken, &tokens)
+				emitCurrToken(&tokenizer.currToken, &tokens)
 				emitToken(HTMLToken{
 					Type: EOF,
 				}, &tokens)
 			case null:
-				currToken.Content = currToken.Content + replacementChar
+				tokenizer.currToken.Content.WriteString(replacementChar)
 			default:
-				currToken.Content = currToken.Content + string(currVal)
+				tokenizer.currToken.Content.WriteByte(currVal)
 			}
 
 		case MarkupDeclarationOpen:
-			if currVal == dash && token.input[token.curr+1] == dash {
-				currToken = HTMLToken{
+			if currVal == dash && tokenizer.input[tokenizer.curr+1] == dash {
+				tokenizer.currToken = HTMLToken{
 					Type:    CommentType,
-					Content: "",
+					Content: strings.Builder{},
 				}
-				state = CommentStart
-				token.curr++
-			} else if Lower(token.input[token.curr:token.curr+7]) == "doctype" {
-				state = Doctype
-				token.curr += 6
-			} else if Lower(token.input[token.curr:token.curr+8]) == "[cdata[" {
-				token.curr += 7
+				tokenizer.state = CommentStart
+				tokenizer.curr++
+			} else if Lower(tokenizer.input[tokenizer.curr:tokenizer.curr+7]) == "doctype" {
+				tokenizer.state = Doctype
+				tokenizer.curr += 6
+			} else if Lower(tokenizer.input[tokenizer.curr:tokenizer.curr+8]) == "[cdata[" {
+				tokenizer.curr += 7
 				//TO DO: implement CDATA section
-				state = CDATASection
+				tokenizer.state = CDATASection
 			} else {
-				currToken = HTMLToken{
+				tokenizer.currToken = HTMLToken{
 					Type:    CommentType,
-					Content: "",
+					Content: strings.Builder{},
 				}
-				state = BogusComment
-				token.curr--
-				reconsume(&state, BogusComment, &token.curr)
+				tokenizer.state = BogusComment
+				tokenizer.curr--
+				reconsume(&tokenizer.state, BogusComment, &tokenizer.curr)
 			}
 
 		case CommentStart:
 			switch currVal {
 			case dash:
-				state = CommentStartDash
+				tokenizer.state = CommentStartDash
 			case greaterThan:
-				state = Data
-				emitCurrToken(&currToken, &tokens)
+				tokenizer.state = Data
+				emitCurrToken(&tokenizer.currToken, &tokens)
 			default:
-				reconsume(&state, Comment, &token.curr)
+				reconsume(&tokenizer.state, Comment, &tokenizer.curr)
 			}
 
 		case CommentStartDash:
 			switch currVal {
 			case dash:
-				state = CommentEnd
+				tokenizer.state = CommentEnd
 			case greaterThan:
-				state = Data
-				emitCurrToken(&currToken, &tokens)
+				tokenizer.state = Data
+				emitCurrToken(&tokenizer.currToken, &tokens)
 			case endOfFile:
-				emitCurrToken(&currToken, &tokens)
+				emitCurrToken(&tokenizer.currToken, &tokens)
 				emitToken(HTMLToken{
 					Type: EOF,
 				}, &tokens)
 			default:
-				currToken.Content = currToken.Content + string(rune(dash))
-				reconsume(&state, Comment, &token.curr)
+				tokenizer.currToken.Content.WriteByte(dash)
+				reconsume(&tokenizer.state, Comment, &tokenizer.curr)
 			}
 
 		case CommentLessThanSign:
 			switch currVal {
 			case exclamationMark:
-				state = CommentLessThanSignBang
-				currToken.Content = currToken.Content + string(rune(exclamationMark))
+				tokenizer.state = CommentLessThanSignBang
+				tokenizer.currToken.Content.WriteByte(exclamationMark)
 			case lesserThan:
-				currToken.Content = currToken.Content + string(rune(exclamationMark))
+				tokenizer.currToken.Content.WriteByte(lesserThan)
 			default:
-				reconsume(&state, Comment, &token.curr)
+				reconsume(&tokenizer.state, Comment, &tokenizer.curr)
 			}
 
 		case CommentLessThanSignBang:
 			if currVal == dash {
-				state = CommentLessThanSignBangDash
+				tokenizer.state = CommentLessThanSignBangDash
 			} else {
-				reconsume(&state, Comment, &token.curr)
+				reconsume(&tokenizer.state, Comment, &tokenizer.curr)
 			}
 
 		case CommentLessThanSignBangDash:
 			if currVal == dash {
-				state = CommentLessThanSignBangDashDash
+				tokenizer.state = CommentLessThanSignBangDashDash
 			} else {
-				reconsume(&state, CommentEndDash, &token.curr)
+				reconsume(&tokenizer.state, CommentEndDash, &tokenizer.curr)
 			}
 
 		case CommentLessThanSignBangDashDash:
 			if currVal == greaterThan || currVal == endOfFile {
-				reconsume(&state, CommentEnd, &token.curr)
+				reconsume(&tokenizer.state, CommentEnd, &tokenizer.curr)
 			} else {
 				//Nested comment parse error
-				reconsume(&state, CommentEnd, &token.curr)
+				reconsume(&tokenizer.state, CommentEnd, &tokenizer.curr)
 			}
 
 		case CommentEndDash:
 			switch currVal {
 			case dash:
-				state = CommentEnd
+				tokenizer.state = CommentEnd
 			case endOfFile:
 				//EOF in comment error
-				emitCurrToken(&currToken, &tokens)
+				emitCurrToken(&tokenizer.currToken, &tokens)
 				emitToken(HTMLToken{
 					Type: EOF,
 				}, &tokens)
 			default:
-				currToken.Content += "-"
-				reconsume(&state, Comment, &token.curr)
+				tokenizer.currToken.Content.WriteByte(dash)
+				reconsume(&tokenizer.state, Comment, &tokenizer.curr)
 			}
 
 		case CommentEnd:
 			switch currVal {
 			case greaterThan:
-				state = Data
-				emitCurrToken(&currToken, &tokens)
+				tokenizer.state = Data
+				emitCurrToken(&tokenizer.currToken, &tokens)
 			case exclamationMark:
-				state = CommentEndBang
+				tokenizer.state = CommentEndBang
 			case dash:
-				currToken.Content += "-"
+				tokenizer.currToken.Content.WriteByte(dash)
 			case endOfFile:
 				//EOF in commment parse error
-				emitCurrToken(&currToken, &tokens)
+				emitCurrToken(&tokenizer.currToken, &tokens)
 				emitToken(HTMLToken{
 					Type: EOF,
 				}, &tokens)
 			default:
-				currToken.Content += "--"
-				reconsume(&state, Comment, &token.curr)
+				tokenizer.currToken.Content.WriteByte(dash)
+				tokenizer.currToken.Content.WriteByte(dash)
+				reconsume(&tokenizer.state, Comment, &tokenizer.curr)
 			}
 
 		case CommentEndBang:
 			switch currVal {
 			case dash:
-				currToken.Content += "--!"
-				state = CommentEndDash
+				tokenizer.currToken.Content.WriteByte(dash)
+				tokenizer.currToken.Content.WriteByte(dash)
+				tokenizer.currToken.Content.WriteByte(exclamationMark)
+				tokenizer.state = CommentEndDash
 			case greaterThan:
 				//Incorrectly closed comment parse error
-				state = Data
-				emitCurrToken(&currToken, &tokens)
+				tokenizer.state = Data
+				emitCurrToken(&tokenizer.currToken, &tokens)
 			case endOfFile:
 				//EOF in comment parse error
-				emitCurrToken(&currToken, &tokens)
+				emitCurrToken(&tokenizer.currToken, &tokens)
 				emitToken(HTMLToken{
 					Type: EOF,
 				}, &tokens)
 			default:
-				currToken.Content += "--!"
-				reconsume(&state, Comment, &token.curr)
+				tokenizer.currToken.Content.WriteByte(dash)
+				tokenizer.currToken.Content.WriteByte(dash)
+				tokenizer.currToken.Content.WriteByte(exclamationMark)
+				reconsume(&tokenizer.state, Comment, &tokenizer.curr)
 			}
 
 		case Doctype:
 			switch currVal {
 			case tab, LF, FF, space:
-				state = BeforeDOCTYPEName
+				tokenizer.state = BeforeDOCTYPEName
 			case greaterThan:
-				reconsume(&state, BeforeAttributeName, &token.curr)
+				reconsume(&tokenizer.state, BeforeAttributeName, &tokenizer.curr)
 			case endOfFile:
 				//end of file in doctype error
-				emitCurrToken(&currToken, &tokens)
-				currToken = HTMLToken{
+				emitCurrToken(&tokenizer.currToken, &tokens)
+				tokenizer.currToken = HTMLToken{
 					Type:            DOCTYPE,
 					ForceQuirksFlag: true,
 				}
@@ -1100,37 +974,37 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 				}, &tokens)
 			default:
 				//missing whitespace before name parse error
-				reconsume(&state, BeforeDOCTYPEName, &token.curr)
+				reconsume(&tokenizer.state, BeforeDOCTYPEName, &tokenizer.curr)
 			}
 
 		case BeforeDOCTYPEName:
 			if currVal == tab || currVal == LF || currVal == FF || currVal == space {
 				//ignore the char
 			} else if isUppercase(currVal) {
-				currToken = HTMLToken{
+				tokenizer.currToken = HTMLToken{
 					Type: DOCTYPE,
 					Name: string(currVal),
 				}
-				state = DOCTYPEName
+				tokenizer.state = DOCTYPEName
 			} else if currVal == null {
 				//unexpected null char parse error
-				currToken = HTMLToken{
+				tokenizer.currToken = HTMLToken{
 					Type: DOCTYPE,
 					Name: replacementChar,
 				}
-				state = DOCTYPEName
+				tokenizer.state = DOCTYPEName
 			} else if currVal == greaterThan {
 				//missing doctype name parse error
-				emitCurrToken(&currToken, &tokens)
-				currToken = HTMLToken{
+				emitCurrToken(&tokenizer.currToken, &tokens)
+				tokenizer.currToken = HTMLToken{
 					Type:            DOCTYPE,
 					ForceQuirksFlag: true,
 				}
-				state = Data
+				tokenizer.state = Data
 			} else if currVal == endOfFile {
 				//EOF in doctype error
-				emitCurrToken(&currToken, &tokens)
-				currToken = HTMLToken{
+				emitCurrToken(&tokenizer.currToken, &tokens)
+				tokenizer.currToken = HTMLToken{
 					Type:            DOCTYPE,
 					ForceQuirksFlag: true,
 				}
@@ -1138,33 +1012,33 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 					Type: EOF,
 				}, &tokens)
 			} else {
-				currToken = HTMLToken{
+				tokenizer.currToken = HTMLToken{
 					Type: DOCTYPE,
 					Name: string(currVal),
 				}
-				state = DOCTYPEName
+				tokenizer.state = DOCTYPEName
 			}
 
 		case DOCTYPEName:
 			if currVal == tab || currVal == LF || currVal == FF || currVal == space {
-				state = AfterDOCTYPEName
+				tokenizer.state = AfterDOCTYPEName
 			} else if currVal == greaterThan {
-				state = Data
-				emitCurrToken(&currToken, &tokens)
+				tokenizer.state = Data
+				emitCurrToken(&tokenizer.currToken, &tokens)
 			} else if isUppercase(currVal) {
-				currToken.Name += string(currVal - 0x20)
+				tokenizer.currToken.Name += string(currVal - 0x20)
 			} else if currVal == null {
 				//unexpected null char error
-				currToken.Name += replacementChar
+				tokenizer.currToken.Name += replacementChar
 			} else if currVal == endOfFile {
 				//EOF in doctype error
-				currToken.ForceQuirksFlag = true
-				emitCurrToken(&currToken, &tokens)
+				tokenizer.currToken.ForceQuirksFlag = true
+				emitCurrToken(&tokenizer.currToken, &tokens)
 				emitToken(HTMLToken{
 					Type: EOF,
 				}, &tokens)
 			} else {
-				currToken.Name += string(currVal)
+				tokenizer.currToken.Name += string(currVal)
 			}
 
 		case AfterDOCTYPEName:
@@ -1172,51 +1046,51 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 			case tab, LF, FF, space:
 				//ignore
 			case greaterThan:
-				state = Data
-				emitCurrToken(&currToken, &tokens)
+				tokenizer.state = Data
+				emitCurrToken(&tokenizer.currToken, &tokens)
 			case endOfFile:
 				//EOF in Doctype Parse Error
-				currToken.ForceQuirksFlag = true
+				tokenizer.currToken.ForceQuirksFlag = true
 			default:
-				if nameInDoctype(token, token.curr, true) {
-					token.curr += 5 //plus the default increment
-					state = AfterDOCTYPEPublicKeyword
-				} else if nameInDoctype(token, token.curr, false) {
-					token.curr += 5
-					state = AfterDOCTYPESystemKeyword
+				if nameInDoctype(&tokenizer, tokenizer.curr, true) {
+					tokenizer.curr += 5 //plus the default increment
+					tokenizer.state = AfterDOCTYPEPublicKeyword
+				} else if nameInDoctype(&tokenizer, tokenizer.curr, false) {
+					tokenizer.curr += 5
+					tokenizer.state = AfterDOCTYPESystemKeyword
 				} else {
 					//Invalid char seq
-					currToken.ForceQuirksFlag = true
-					reconsume(&state, BogusDOCTYPE, &token.curr)
+					tokenizer.currToken.ForceQuirksFlag = true
+					reconsume(&tokenizer.state, BogusDOCTYPE, &tokenizer.curr)
 				}
 			}
 
 		case AfterDOCTYPEPublicKeyword:
 			switch currVal {
 			case tab, LF, FF, space:
-				state = BeforeDOCTYPEPublicIdentifier
+				tokenizer.state = BeforeDOCTYPEPublicIdentifier
 			case quoteMark:
 				//missing whitespace after doctype public keyword error
-				currToken.PublicID = ""
-				state = DOCTYPEPublicIdentifierDoubleQuoted
+				tokenizer.currToken.PublicID = ""
+				tokenizer.state = DOCTYPEPublicIdentifierDoubleQuoted
 			case apostrophe:
 				//error
-				currToken.PublicID = ""
-				state = DOCTYPEPublicIdentifierSingleQuoted
+				tokenizer.currToken.PublicID = ""
+				tokenizer.state = DOCTYPEPublicIdentifierSingleQuoted
 			case greaterThan:
 				//error
-				currToken.ForceQuirksFlag = true
-				state = Data
-				emitCurrToken(&currToken, &tokens)
+				tokenizer.currToken.ForceQuirksFlag = true
+				tokenizer.state = Data
+				emitCurrToken(&tokenizer.currToken, &tokens)
 			case endOfFile:
 				//error
-				currToken.ForceQuirksFlag = true
-				emitCurrToken(&currToken, &tokens)
-				reconsume(&state, BogusDOCTYPE, &token.curr)
+				tokenizer.currToken.ForceQuirksFlag = true
+				emitCurrToken(&tokenizer.currToken, &tokens)
+				reconsume(&tokenizer.state, BogusDOCTYPE, &tokenizer.curr)
 			default:
 				//error
-				currToken.ForceQuirksFlag = true
-				reconsume(&state, BogusDOCTYPE, &token.curr)
+				tokenizer.currToken.ForceQuirksFlag = true
+				reconsume(&tokenizer.state, BogusDOCTYPE, &tokenizer.curr)
 			}
 
 		case BeforeDOCTYPEPublicIdentifier:
@@ -1224,102 +1098,102 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 			case tab, LF, FF, space:
 				//ignore
 			case quoteMark:
-				currToken.PublicID = ""
-				state = DOCTYPEPublicIdentifierDoubleQuoted
+				tokenizer.currToken.PublicID = ""
+				tokenizer.state = DOCTYPEPublicIdentifierDoubleQuoted
 			case apostrophe:
-				currToken.PublicID = ""
-				state = DOCTYPEPublicIdentifierSingleQuoted
+				tokenizer.currToken.PublicID = ""
+				tokenizer.state = DOCTYPEPublicIdentifierSingleQuoted
 			case greaterThan:
 				//error
-				currToken.ForceQuirksFlag = true
-				state = Data
-				emitCurrToken(&currToken, &tokens)
+				tokenizer.currToken.ForceQuirksFlag = true
+				tokenizer.state = Data
+				emitCurrToken(&tokenizer.currToken, &tokens)
 			case endOfFile:
 				//parse error
-				currToken.ForceQuirksFlag = true
-				emitCurrToken(&currToken, &tokens)
+				tokenizer.currToken.ForceQuirksFlag = true
+				emitCurrToken(&tokenizer.currToken, &tokens)
 				emitToken(HTMLToken{
 					Type: EOF,
 				}, &tokens)
 			default:
 				//parse error
-				currToken.ForceQuirksFlag = true
-				reconsume(&state, BogusDOCTYPE, &token.curr)
+				tokenizer.currToken.ForceQuirksFlag = true
+				reconsume(&tokenizer.state, BogusDOCTYPE, &tokenizer.curr)
 			}
 
 		case DOCTYPEPublicIdentifierDoubleQuoted:
 			switch currVal {
 			case quoteMark:
-				state = AfterDOCTYPEPublicIdentifier
+				tokenizer.state = AfterDOCTYPEPublicIdentifier
 			case null:
 				//error
-				currToken.PublicID += replacementChar
+				tokenizer.currToken.PublicID += replacementChar
 			case greaterThan:
 				//error
-				currToken.ForceQuirksFlag = true
-				state = Data
-				emitCurrToken(&currToken, &tokens)
+				tokenizer.currToken.ForceQuirksFlag = true
+				tokenizer.state = Data
+				emitCurrToken(&tokenizer.currToken, &tokens)
 			case endOfFile:
 				//parse error
-				currToken.ForceQuirksFlag = true
-				emitCurrToken(&currToken, &tokens)
+				tokenizer.currToken.ForceQuirksFlag = true
+				emitCurrToken(&tokenizer.currToken, &tokens)
 				emitToken(HTMLToken{
 					Type: EOF,
 				}, &tokens)
 			default:
-				currToken.PublicID += string(currVal)
+				tokenizer.currToken.PublicID += string(currVal)
 			}
 
 		case DOCTYPEPublicIdentifierSingleQuoted:
 			switch currVal {
 			case apostrophe:
-				state = AfterDOCTYPEPublicIdentifier
+				tokenizer.state = AfterDOCTYPEPublicIdentifier
 			case null:
 				//parse error
-				currToken.PublicID += replacementChar
+				tokenizer.currToken.PublicID += replacementChar
 			case greaterThan:
 				//parse error
-				currToken.ForceQuirksFlag = true
-				state = Data
-				emitCurrToken(&currToken, &tokens)
+				tokenizer.currToken.ForceQuirksFlag = true
+				tokenizer.state = Data
+				emitCurrToken(&tokenizer.currToken, &tokens)
 			case endOfFile:
 				//parse error
-				currToken.ForceQuirksFlag = true
-				state = Data
-				emitCurrToken(&currToken, &tokens)
+				tokenizer.currToken.ForceQuirksFlag = true
+				tokenizer.state = Data
+				emitCurrToken(&tokenizer.currToken, &tokens)
 				emitToken(HTMLToken{
 					Type: EOF,
 				}, &tokens)
 			default:
-				currToken.PublicID += string(currVal)
+				tokenizer.currToken.PublicID += string(currVal)
 			}
 
 		case AfterDOCTYPEPublicIdentifier:
 			switch currVal {
 			case tab, LF, FF, space:
-				state = BetweenDOCTYPEPublicAndSystemIdentifiers
+				tokenizer.state = BetweenDOCTYPEPublicAndSystemIdentifiers
 			case greaterThan:
-				state = Data
-				emitCurrToken(&currToken, &tokens)
+				tokenizer.state = Data
+				emitCurrToken(&tokenizer.currToken, &tokens)
 			case quoteMark:
 				//parse error
-				currToken.SystemID = ""
-				state = DOCTYPESystemIdentifierDoubleQuoted
+				tokenizer.currToken.SystemID = ""
+				tokenizer.state = DOCTYPESystemIdentifierDoubleQuoted
 			case apostrophe:
 				//parse error
-				currToken.SystemID = ""
-				state = DOCTYPESystemIdentifierSingleQuoted
+				tokenizer.currToken.SystemID = ""
+				tokenizer.state = DOCTYPESystemIdentifierSingleQuoted
 			case endOfFile:
 				//parse error
-				currToken.ForceQuirksFlag = true
-				emitCurrToken(&currToken, &tokens)
+				tokenizer.currToken.ForceQuirksFlag = true
+				emitCurrToken(&tokenizer.currToken, &tokens)
 				emitToken(HTMLToken{
 					Type: EOF,
 				}, &tokens)
 			default:
 				//parse error
-				currToken.SelfClosingFlag = true
-				reconsume(&state, BogusDOCTYPE, &token.curr)
+				tokenizer.currToken.SelfClosingFlag = true
+				reconsume(&tokenizer.state, BogusDOCTYPE, &tokenizer.curr)
 			}
 
 		case BetweenDOCTYPEPublicAndSystemIdentifiers:
@@ -1327,55 +1201,55 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 			case tab, LF, FF, space:
 				//ignore
 			case greaterThan:
-				state = Data
-				emitCurrToken(&currToken, &tokens)
+				tokenizer.state = Data
+				emitCurrToken(&tokenizer.currToken, &tokens)
 			case quoteMark:
-				currToken.SystemID = ""
-				state = DOCTYPESystemIdentifierDoubleQuoted
+				tokenizer.currToken.SystemID = ""
+				tokenizer.state = DOCTYPESystemIdentifierDoubleQuoted
 			case apostrophe:
-				currToken.SystemID = ""
-				state = DOCTYPESystemIdentifierSingleQuoted
+				tokenizer.currToken.SystemID = ""
+				tokenizer.state = DOCTYPESystemIdentifierSingleQuoted
 			case endOfFile:
 				//parse error
-				currToken.ForceQuirksFlag = true
-				emitCurrToken(&currToken, &tokens)
+				tokenizer.currToken.ForceQuirksFlag = true
+				emitCurrToken(&tokenizer.currToken, &tokens)
 				emitToken(HTMLToken{
 					Type: EOF,
 				}, &tokens)
 			default:
 				//parse error
-				currToken.ForceQuirksFlag = true
-				reconsume(&state, BogusDOCTYPE, &token.curr)
+				tokenizer.currToken.ForceQuirksFlag = true
+				reconsume(&tokenizer.state, BogusDOCTYPE, &tokenizer.curr)
 			}
 
 		case AfterDOCTYPESystemKeyword:
 			switch currVal {
 			case tab, LF, FF, space:
-				state = BeforeDOCTYPESystemIdentifier
+				tokenizer.state = BeforeDOCTYPESystemIdentifier
 			case quoteMark:
 				//parse error
-				currToken.SystemID = ""
-				state = DOCTYPESystemIdentifierDoubleQuoted
+				tokenizer.currToken.SystemID = ""
+				tokenizer.state = DOCTYPESystemIdentifierDoubleQuoted
 			case apostrophe:
 				//parse error
-				currToken.SystemID = ""
-				state = DOCTYPESystemIdentifierSingleQuoted
+				tokenizer.currToken.SystemID = ""
+				tokenizer.state = DOCTYPESystemIdentifierSingleQuoted
 			case greaterThan:
 				//parse error
-				currToken.ForceQuirksFlag = true
-				state = Data
-				emitCurrToken(&currToken, &tokens)
+				tokenizer.currToken.ForceQuirksFlag = true
+				tokenizer.state = Data
+				emitCurrToken(&tokenizer.currToken, &tokens)
 			case endOfFile:
 				//parse error
-				currToken.ForceQuirksFlag = true
-				emitCurrToken(&currToken, &tokens)
+				tokenizer.currToken.ForceQuirksFlag = true
+				emitCurrToken(&tokenizer.currToken, &tokens)
 				emitToken(HTMLToken{
 					Type: EOF,
 				}, &tokens)
 			default:
 				//parse error
-				currToken.ForceQuirksFlag = true
-				reconsume(&state, BogusDOCTYPE, &token.curr)
+				tokenizer.currToken.ForceQuirksFlag = true
+				reconsume(&tokenizer.state, BogusDOCTYPE, &tokenizer.curr)
 			}
 
 		case BeforeDOCTYPESystemIdentifier:
@@ -1383,73 +1257,73 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 			case tab, LF, FF, space:
 				//ignore
 			case quoteMark:
-				currToken.SystemID = ""
-				state = DOCTYPESystemIdentifierDoubleQuoted
+				tokenizer.currToken.SystemID = ""
+				tokenizer.state = DOCTYPESystemIdentifierDoubleQuoted
 			case apostrophe:
-				currToken.SystemID = ""
-				state = DOCTYPESystemIdentifierSingleQuoted
+				tokenizer.currToken.SystemID = ""
+				tokenizer.state = DOCTYPESystemIdentifierSingleQuoted
 			case greaterThan:
 				//parse error
-				currToken.ForceQuirksFlag = true
-				state = Data
-				emitCurrToken(&currToken, &tokens)
+				tokenizer.currToken.ForceQuirksFlag = true
+				tokenizer.state = Data
+				emitCurrToken(&tokenizer.currToken, &tokens)
 			case endOfFile:
 				//parse error
-				currToken.ForceQuirksFlag = true
-				emitCurrToken(&currToken, &tokens)
+				tokenizer.currToken.ForceQuirksFlag = true
+				emitCurrToken(&tokenizer.currToken, &tokens)
 				emitToken(HTMLToken{
 					Type: EOF,
 				}, &tokens)
 			default:
 				//parse error
-				currToken.ForceQuirksFlag = true
-				reconsume(&state, BogusDOCTYPE, &token.curr)
+				tokenizer.currToken.ForceQuirksFlag = true
+				reconsume(&tokenizer.state, BogusDOCTYPE, &tokenizer.curr)
 			}
 
 		case DOCTYPESystemIdentifierDoubleQuoted:
 			switch currVal {
 			case quoteMark:
-				state = AfterDOCTYPESystemIdentifier
+				tokenizer.state = AfterDOCTYPESystemIdentifier
 			case null:
 				//parse error
-				currToken.SystemID += replacementChar
+				tokenizer.currToken.SystemID += replacementChar
 			case greaterThan:
 				//parse error
-				currToken.ForceQuirksFlag = true
-				state = Data
-				emitCurrToken(&currToken, &tokens)
+				tokenizer.currToken.ForceQuirksFlag = true
+				tokenizer.state = Data
+				emitCurrToken(&tokenizer.currToken, &tokens)
 			case endOfFile:
 				//parse error
-				currToken.ForceQuirksFlag = true
-				emitCurrToken(&currToken, &tokens)
+				tokenizer.currToken.ForceQuirksFlag = true
+				emitCurrToken(&tokenizer.currToken, &tokens)
 				emitToken(HTMLToken{
 					Type: EOF,
 				}, &tokens)
 			default:
-				currToken.SystemID += string(currVal)
+				tokenizer.currToken.SystemID += string(currVal)
 			}
 
 		case DOCTYPESystemIdentifierSingleQuoted:
 			switch currVal {
 			case apostrophe:
-				state = AfterDOCTYPESystemIdentifier
+				tokenizer.state = AfterDOCTYPESystemIdentifier
 			case null:
 				//parse
-				currToken.SystemID += replacementChar
+				tokenizer.currToken.SystemID += replacementChar
 			case greaterThan:
 				//parse error
-				currToken.ForceQuirksFlag = true
-				state = Data
-				emitCurrToken(&currToken, &tokens)
+				tokenizer.currToken.ForceQuirksFlag = true
+				tokenizer.state = Data
+				emitCurrToken(&tokenizer.currToken, &tokens)
 			case endOfFile:
 				//parse error
-				currToken.ForceQuirksFlag = true
-				emitCurrToken(&currToken, &tokens)
+				tokenizer.currToken.ForceQuirksFlag = true
+				emitCurrToken(&tokenizer.currToken, &tokens)
 				emitToken(HTMLToken{
 					Type: EOF,
 				}, &tokens)
 			default:
-				currToken.SystemID += string(currVal)
+				tokenizer.currToken.SystemID += string(currVal)
 			}
 
 		case AfterDOCTYPESystemIdentifier:
@@ -1457,30 +1331,30 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 			case tab, LF, FF, space:
 				//ignore
 			case greaterThan:
-				state = Data
-				emitCurrToken(&currToken, &tokens)
+				tokenizer.state = Data
+				emitCurrToken(&tokenizer.currToken, &tokens)
 			case endOfFile:
 				//parse error
-				currToken.ForceQuirksFlag = true
-				emitCurrToken(&currToken, &tokens)
+				tokenizer.currToken.ForceQuirksFlag = true
+				emitCurrToken(&tokenizer.currToken, &tokens)
 				emitToken(HTMLToken{
 					Type: EOF,
 				}, &tokens)
 			default:
 				//parse error, no flag
-				reconsume(&state, BogusDOCTYPE, &token.curr)
+				reconsume(&tokenizer.state, BogusDOCTYPE, &tokenizer.curr)
 			}
 
 		case BogusDOCTYPE:
 			switch currVal {
 			case greaterThan:
-				state = Data
-				emitCurrToken(&currToken, &tokens)
+				tokenizer.state = Data
+				emitCurrToken(&tokenizer.currToken, &tokens)
 			case null:
 				//parse error
 				//ignore
 			case endOfFile:
-				emitCurrToken(&currToken, &tokens)
+				emitCurrToken(&tokenizer.currToken, &tokens)
 				emitToken(HTMLToken{
 					Type: EOF,
 				}, &tokens)
@@ -1491,68 +1365,63 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 		case CDATASection:
 			switch currVal {
 			case rightSquareBracket:
-				state = CDATASectionBracket
+				tokenizer.state = CDATASectionBracket
 			case endOfFile:
 				//parse error
 				emitToken(HTMLToken{
 					Type: EOF,
 				}, &tokens)
 			default:
-				emitCurrToken(&currToken, &tokens)
+				emitCurrToken(&tokenizer.currToken, &tokens)
 			}
 
 		case CDATASectionBracket:
 			switch currVal {
 			case rightSquareBracket:
-				state = CDATASectionEnd
+				tokenizer.state = CDATASectionEnd
 			default:
-				emitToken(HTMLToken{
-					Type:    Character,
-					Content: "]",
-				}, &tokens)
-				reconsume(&state, CDATASection, &token.curr)
+				tokenizer.tmpBuffer.WriteByte(leftSquareBracket)
+				reconsume(&tokenizer.state, CDATASection, &tokenizer.curr)
 			}
 
 		case CDATASectionEnd:
 			switch currVal {
 			case rightSquareBracket:
-				emitToken(HTMLToken{
-					Type:    Character,
-					Content: "]",
-				}, &tokens)
+				tokenizer.tmpBuffer.WriteByte(leftSquareBracket)
 			case greaterThan:
-				state = Data
+				tokenizer.state = Data
 			default:
 				rightBracket := HTMLToken{
 					Type:    Character,
-					Content: "]",
+					Content: toBuilder(string(rune(rightSquareBracket))),
 				}
 				emitToken(rightBracket, &tokens)
 				emitToken(rightBracket, &tokens)
-				reconsume(&state, CDATASection, &token.curr)
+				reconsume(&tokenizer.state, CDATASection, &tokenizer.curr)
 			}
 
 		case CharacterReference:
-			tmpBuffer = "&"
+			tokenizer.tmpBuffer.Reset()
+			tokenizer.tmpBuffer.WriteByte(ampersand)
 			if isASCIIAlphanumeric(currVal) {
-				reconsume(&state, NamedCharacterReference, &token.curr)
+				reconsume(&tokenizer.state, NamedCharacterReference, &tokenizer.curr)
 			} else if currVal == numberSign {
-				tmpBuffer += string(currVal)
-				state = NumericCharacterReference
+				tokenizer.tmpBuffer.WriteByte(currVal)
+				tokenizer.state = NumericCharacterReference
 			} else {
-				prev := popState(&returnState)
-				flushCodePoints(&currToken, prev, tmpBuffer, &tokens)
-				tmpBuffer = ""
-				reconsume(&state, prev, &token.curr)
+				prev := popState(&tokenizer.returnState)
+				flushCodePoints(&tokenizer.currToken, prev, tokenizer.tmpBuffer.String(), &tokens)
+				tokenizer.tmpBuffer.Reset()
+				reconsume(&tokenizer.state, prev, &tokenizer.curr)
 			}
 
 		case NamedCharacterReference:
 			for isASCIIAlpha(currVal) {
-				tmpBuffer += string(currVal)
-				token.curr++
-				currVal = token.input[token.curr]
+				tokenizer.tmpBuffer.WriteByte(currVal)
+				tokenizer.curr++
+				currVal = tokenizer.input[tokenizer.curr]
 			}
-			token.curr--
+			tokenizer.curr--
 
 		case AmbiguousAmpersand:
 			if isASCIIAlphanumeric(currVal) {
@@ -1562,8 +1431,8 @@ func TokenizeHTML(token *HTMLTokenizer) []HTMLToken {
 		default:
 			fmt.Println("Not here yet")
 		}
-		//consume the current current character (token.curr-- in individual cases otherwise or reconsume func)
-		token.curr++
+		//consume the current current character (tokenizer.curr-- in individual cases otherwise or reconsume func)
+		tokenizer.curr++
 
 	}
 	return tokens

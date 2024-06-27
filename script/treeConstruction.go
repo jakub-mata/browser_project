@@ -45,7 +45,7 @@ func buildParseTree(tokens []HTMLToken) (TreeRoot, error) {
 		case CommentType:
 			//ignore
 		case Character:
-			currentNode.Text.WriteString(token.Content)
+			currentNode.Text.WriteString(token.Content.String())
 		case EOF:
 			return root, nil
 		}

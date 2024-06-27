@@ -3,6 +3,7 @@ package main
 import (
 	"slices"
 	"strings"
+	"unicode"
 )
 
 const (
@@ -27,10 +28,6 @@ const (
 	leftSquareBracket  = 0x005B
 	numberSign         = 0x0023
 )
-
-func isNewline(check byte) bool {
-	return (check == 0x0A) || (check == 0x0D)
-}
 
 func isASCIIAlpha(s byte) bool {
 	return isUppercase(s) || isLowercase(s)
@@ -76,7 +73,16 @@ func emitCurrToken(currToken *HTMLToken, tokens *[]HTMLToken) {
 }
 
 func NewHTMLTokenizer(input []byte) *HTMLTokenizer {
-	return &HTMLTokenizer{input: input, curr: 0}
+	var states []State
+	return &HTMLTokenizer{
+		input:            input,
+		curr:             0,
+		state:            Data,
+		returnState:      states,
+		tmpBuffer:        strings.Builder{},
+		lastStartTagName: "",
+		currToken:        HTMLToken{},
+	}
 }
 
 func reconsume(state *State, switchTo State, pointer *int) {
@@ -133,9 +139,26 @@ func flushCodePoints(currToken *HTMLToken, returnState State, tmpBuffer string, 
 	if slices.Contains(asAnAttribute, returnState) {
 		currToken.Attributes[len(currToken.Attributes)-1].Value = tmpBuffer
 	} else {
+		var content strings.Builder
+		content.WriteString(tmpBuffer)
 		emitToken(HTMLToken{
 			Type:    Character,
-			Content: tmpBuffer,
+			Content: content,
 		}, tokens)
 	}
+}
+
+func isNotWhitespace(sb string) bool {
+	for i := 0; i < len(sb); i++ {
+		if !unicode.IsSpace(rune(sb[i])) {
+			return true
+		}
+	}
+	return false
+}
+
+func toBuilder(char string) strings.Builder {
+	var sb strings.Builder
+	sb.WriteString(char)
+	return sb
 }

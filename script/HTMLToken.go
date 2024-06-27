@@ -24,14 +24,14 @@ type HTMLToken struct {
 	ForceQuirksFlag bool   //doctype
 	SelfClosingFlag bool   //start and end tags
 	Attributes      []Attribute
-	Content         string //comments and characters
+	Content         strings.Builder //comments and characters
 }
 
 func (t HTMLToken) String() string {
 	var sb strings.Builder
 
 	sb.WriteString(fmt.Sprintf("Type: %v, Name: %s, Content: %s, ",
-		getTokenType(t.Type), t.Name, t.Content))
+		getTokenType(t.Type), t.Name, t.Content.String()))
 
 	for i, attr := range t.Attributes {
 		if i != 0 {
