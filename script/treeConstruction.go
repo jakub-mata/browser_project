@@ -4,8 +4,6 @@ import (
 	"strings"
 )
 
-//const htmlTag string = "html"
-
 type TreeVertex struct {
 	Token    HTMLToken
 	Children []*TreeVertex
@@ -26,11 +24,11 @@ func findComplementaryOpenTag(node *TreeVertex, name string) *TreeVertex {
 	for prevNode.Token.Name != name {
 		prevNode = prevNode.Parent
 	}
-	return prevNode
+	return prevNode.Parent
 }
 
-func buildParseTree(tokens []HTMLToken) (TreeRoot, error) {
-	root := createRoot(tokens[0]) //findRoot(tokens)
+func buildParseTree(tokens []HTMLToken) (*TreeRoot, error) {
+	root := createRoot(tokens[0])
 
 	currentNode := &root.Root
 	for i := 1; i < len(tokens); i++ {
@@ -39,7 +37,9 @@ func buildParseTree(tokens []HTMLToken) (TreeRoot, error) {
 		case StartTag, DOCTYPE:
 			child := TreeVertex{token, nil, strings.Builder{}, currentNode}
 			currentNode.Children = append(currentNode.Children, &child)
-			currentNode = &child
+			if !child.Token.SelfClosingFlag {
+				currentNode = &child
+			} //otherwise stays the same
 		case EndTag:
 			currentNode = findComplementaryOpenTag(currentNode, token.Name)
 		case CommentType:
@@ -47,9 +47,9 @@ func buildParseTree(tokens []HTMLToken) (TreeRoot, error) {
 		case Character:
 			currentNode.Text.WriteString(token.Content.String())
 		case EOF:
-			return root, nil
+			return &root, nil
 		}
 	}
 
-	return root, nil
+	return &root, nil
 }
