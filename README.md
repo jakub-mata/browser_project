@@ -1,5 +1,5 @@
 # browser_project
-A personal browser in Go to learn Go fundamentals and basics of the web
+A personal browser in Golang to learn Go fundamentals and basics of the web
 
 ##ToDo:
 
