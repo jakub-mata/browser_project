@@ -16,7 +16,6 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	if printParser {
-		printTree(root.Root, 0)
-	}
+
+	CreateViewer(root)
 }
