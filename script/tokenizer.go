@@ -19,7 +19,7 @@ type HTMLTokenizer struct {
 
 //MAIN TOKENIZER FUNCTION
 
-func (tokenizer HTMLTokenizer) TokenizeHTML() []HTMLToken {
+func (tokenizer HTMLTokenizer) TokenizeHTML(printTokens bool) []HTMLToken {
 
 	var tokens []HTMLToken
 
@@ -1435,5 +1435,16 @@ func (tokenizer HTMLTokenizer) TokenizeHTML() []HTMLToken {
 		tokenizer.curr++
 
 	}
+
+	if printTokens {
+		logTokens(&tokens)
+	}
 	return tokens
+}
+
+func logTokens(tokenOutput *[]HTMLToken) {
+
+	for _, token := range *tokenOutput {
+		fmt.Println(token)
+	}
 }

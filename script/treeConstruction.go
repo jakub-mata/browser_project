@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"strings"
 )
 
@@ -27,7 +28,7 @@ func findComplementaryOpenTag(node *TreeVertex, name string) *TreeVertex {
 	return prevNode.Parent
 }
 
-func buildParseTree(tokens []HTMLToken) (*TreeRoot, error) {
+func buildParseTree(tokens []HTMLToken, printParser bool) (*TreeRoot, error) {
 	root := createRoot(tokens[0])
 
 	currentNode := &root.Root
@@ -51,5 +52,20 @@ func buildParseTree(tokens []HTMLToken) (*TreeRoot, error) {
 		}
 	}
 
+	if printParser {
+		printTree(root.Root, 0)
+	}
 	return &root, nil
+}
+
+func printTree(root TreeVertex, depth int) {
+	for i := 0; i < depth; i++ {
+		fmt.Printf(" ")
+	}
+	fmt.Printf("Name: %s, Text: %s", root.Token.Name, &root.Text)
+	fmt.Println()
+
+	for _, child := range root.Children {
+		printTree(*child, depth+1)
+	}
 }
