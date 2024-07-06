@@ -13,11 +13,11 @@ type TreeVertex struct {
 }
 
 type TreeRoot struct {
-	Root TreeVertex
+	Root *TreeVertex
 }
 
 func createRoot(rootToken HTMLToken) TreeRoot {
-	return TreeRoot{TreeVertex{rootToken, nil, strings.Builder{}, nil}}
+	return TreeRoot{&TreeVertex{rootToken, nil, strings.Builder{}, nil}}
 }
 
 func findComplementaryOpenTag(node *TreeVertex, name string) *TreeVertex {
@@ -31,7 +31,7 @@ func findComplementaryOpenTag(node *TreeVertex, name string) *TreeVertex {
 func buildParseTree(tokens []HTMLToken, printParser bool) (*TreeRoot, error) {
 	root := createRoot(tokens[0])
 
-	currentNode := &root.Root
+	currentNode := root.Root
 	for i := 1; i < len(tokens); i++ {
 		token := tokens[i]
 		switch token.Type {
@@ -53,7 +53,7 @@ func buildParseTree(tokens []HTMLToken, printParser bool) (*TreeRoot, error) {
 	}
 
 	if printParser {
-		printTree(root.Root, 0)
+		printTree(*root.Root, 0)
 	}
 	return &root, nil
 }
