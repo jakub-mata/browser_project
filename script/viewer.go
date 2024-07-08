@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"image/color"
 
 	"fyne.io/fyne/v2"
@@ -14,7 +15,10 @@ var PAGE_TITLE string = "Hello World"
 
 func CreateViewer(root *TreeRoot) {
 	viewerApp := app.New()
-	mainContainer := root.Root.traverseParsingTree()
+	mainContainer, err := root.Root.traverseParsingTree()
+	if err != nil {
+		fmt.Println("No page to display")
+	}
 
 	window := viewerApp.NewWindow(PAGE_TITLE)
 	window.Resize(fyne.NewSize(800, 800))
@@ -24,34 +28,30 @@ func CreateViewer(root *TreeRoot) {
 	viewerApp.Run()
 }
 
-func (root *TreeVertex) traverseParsingTree() fyne.CanvasObject {
+func (root *TreeVertex) traverseParsingTree() (fyne.CanvasObject, error) {
 
 	//Recursion
 	var childContainers []fyne.CanvasObject
 	for _, child := range root.Children {
-		childContainers = append(childContainers, child.traverseParsingTree())
+		cc, err := child.traverseParsingTree()
+		if err == nil {
+			childContainers = append(childContainers, cc)
+		}
 	}
 	//Node itself
 
-	if root.Token.Name == "head" {
-		findTitle(root)
+	if root.Token.Name == "title" {
+		PAGE_TITLE = root.Text.String()
 	}
 
 	rootContainer, err := containerFactory(root)
 	if err != nil {
-		return rootContainer
+		return rootContainer, err
 	}
+
 	baseContainer := container.NewVBox(
 		rootContainer,
 		container.NewVBox(childContainers...),
 	)
-	return baseContainer
-}
-
-func findTitle(headElement *TreeVertex) {
-	for _, child := range headElement.Children {
-		if child.Token.Name == "title" {
-			PAGE_TITLE = child.Text.String()
-		}
-	}
+	return baseContainer, nil
 }

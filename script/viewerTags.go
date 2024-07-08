@@ -49,8 +49,15 @@ var defaultValuesMap = map[string]DefaultValues{
 	},
 	"em": {
 		fontStyle: fyne.TextStyle{Bold: true},
+		display:   "inline",
 	},
-	"a": {},
+	"a": {
+		display: "inline",
+	},
+	"head":  {},
+	"title": {},
+	"link":  {},
+	"meta":  {},
 }
 
 func getDefaults(name string) (DefaultValues, bool) {
@@ -60,10 +67,15 @@ func getDefaults(name string) (DefaultValues, bool) {
 
 func containerFactory(e *TreeVertex) (fyne.CanvasObject, error) {
 	defaultValues, included := getDefaults(e.Token.Name)
+
 	if !included {
 		return container.NewHBox(
 			widget.NewLabel(e.Token.Name),
 		), nil
+	}
+
+	if defaultValues.display == "" {
+		return container.NewWithoutLayout(), fmt.Errorf("no display value")
 	}
 
 	switch e.Token.Name {
