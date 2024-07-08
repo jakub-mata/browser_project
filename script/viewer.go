@@ -30,7 +30,10 @@ func (root *TreeVertex) traverseParsingTree() fyne.CanvasObject {
 		childContainers = append(childContainers, child.traverseParsingTree())
 	}
 
-	rootContainer := containerFactory(root)
+	rootContainer, err := containerFactory(root)
+	if err != nil {
+		return rootContainer
+	}
 	baseContainer := container.NewVBox(
 		rootContainer,
 		container.NewVBox(childContainers...),
