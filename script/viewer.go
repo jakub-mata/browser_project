@@ -10,13 +10,14 @@ import (
 
 var BORDER_COLOR color.Gray16 = color.Black
 var TEXT_COLOR color.Gray16 = color.Black
+var PAGE_TITLE string = "Hello World"
 
 func CreateViewer(root *TreeRoot) {
 	viewerApp := app.New()
-	window := viewerApp.NewWindow("Hello World")
-	window.Resize(fyne.NewSize(800, 800))
-
 	mainContainer := root.Root.traverseParsingTree()
+
+	window := viewerApp.NewWindow(PAGE_TITLE)
+	window.Resize(fyne.NewSize(800, 800))
 	window.SetContent(container.NewScroll(mainContainer))
 
 	window.Show()
@@ -25,9 +26,15 @@ func CreateViewer(root *TreeRoot) {
 
 func (root *TreeVertex) traverseParsingTree() fyne.CanvasObject {
 
+	//Recursion
 	var childContainers []fyne.CanvasObject
 	for _, child := range root.Children {
 		childContainers = append(childContainers, child.traverseParsingTree())
+	}
+	//Node itself
+
+	if root.Token.Name == "head" {
+		findTitle(root)
 	}
 
 	rootContainer, err := containerFactory(root)
@@ -39,4 +46,12 @@ func (root *TreeVertex) traverseParsingTree() fyne.CanvasObject {
 		container.NewVBox(childContainers...),
 	)
 	return baseContainer
+}
+
+func findTitle(headElement *TreeVertex) {
+	for _, child := range headElement.Children {
+		if child.Token.Name == "title" {
+			PAGE_TITLE = child.Text.String()
+		}
+	}
 }
