@@ -10,54 +10,92 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
+type DisplayValue int8
+
+const (
+	block DisplayValue = iota
+	inline
+	inlineBlock
+	none
+)
+
 type DefaultValues struct {
 	fontSize  float32
 	fontStyle fyne.TextStyle
 	textAlign fyne.TextAlign
-	display   string
+	display   DisplayValue
 }
 
 var defaultValuesMap = map[string]DefaultValues{
 	"p": {
 		fontSize:  16,
 		textAlign: fyne.TextAlignLeading,
-		display:   "block",
+		display:   block,
 	},
 	"h1": {
 		fontSize: 32,
-		display:  "block",
+		display:  block,
 	},
 	"h2": {
 		fontSize: 24,
-		display:  "block",
+		display:  block,
 	},
 	"h3": {
 		fontSize: 18.72,
-		display:  "block",
+		display:  block,
 	},
 	"h4": {
 		fontSize: 16,
-		display:  "block",
+		display:  block,
 	},
 	"h5": {
 		fontSize: 13.28,
-		display:  "block",
+		display:  block,
 	},
 	"h6": {
 		fontSize: 10.72,
-		display:  "block",
+		display:  block,
 	},
 	"em": {
 		fontStyle: fyne.TextStyle{Bold: true},
-		display:   "inline",
+		display:   inline,
 	},
 	"a": {
-		display: "inline",
+		display: inline,
 	},
-	"head":  {},
-	"title": {},
-	"link":  {},
-	"meta":  {},
+	"div": {
+		display: block,
+	},
+	"head": {
+		display: none,
+	},
+	"title": {
+		display: none,
+	},
+	"link": {
+		display: none,
+	},
+	"meta": {
+		display: none,
+	},
+	"br": {
+		display: block,
+	},
+	"hr": {
+		display: block,
+	},
+	"body": {
+		display: block,
+	},
+	"footer": {
+		display: block,
+	},
+	"header": {
+		display: block,
+	},
+	"html": {
+		display: block,
+	},
 }
 
 func getDefaults(name string) (DefaultValues, bool) {
@@ -74,16 +112,12 @@ func containerFactory(e *TreeVertex) (fyne.CanvasObject, error) {
 		), nil
 	}
 
-	if defaultValues.display == "" {
+	if defaultValues.display == none {
 		return container.NewWithoutLayout(), fmt.Errorf("no display value")
 	}
 
 	switch e.Token.Name {
-	case "p":
-		label := canvas.NewText(e.Text.String(), TEXT_COLOR)
-		label.TextSize = defaultValues.fontSize
-		return container.NewHBox(label), nil
-	case "h1", "h2", "h3", "h4", "h5", "h6":
+	case "h1", "h2", "h3", "h4", "h5", "h6", "p":
 		label := canvas.NewText(e.Text.String(), TEXT_COLOR)
 		label.TextSize = defaultValues.fontSize
 		return container.NewHBox(label), nil
@@ -95,7 +129,17 @@ func containerFactory(e *TreeVertex) (fyne.CanvasObject, error) {
 
 		hyperLink := widget.NewHyperlink(e.Text.String(), linkValue)
 		return container.NewHBox(hyperLink), nil
-
+	case "div", "body", "header", "footer", "html":
+		if e.Text.Len() == 0 {
+			return container.NewVBox(), nil
+		}
+		label := canvas.NewText(e.Text.String(), TEXT_COLOR)
+		return container.NewVBox(label), nil
+	case "br":
+		return container.NewVBox(), nil
+	case "hr":
+		line := canvas.NewLine(TEXT_COLOR)
+		return container.NewHBox(line), nil
 	default:
 		return container.NewWithoutLayout(), nil
 	}
