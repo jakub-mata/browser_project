@@ -7,6 +7,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/storage"
 	"fyne.io/fyne/v2/widget"
 )
 
@@ -87,6 +88,9 @@ var defaultValuesMap = map[string]DefaultValues{
 	"body": {
 		display: block,
 	},
+	"main": {
+		display: block,
+	},
 	"footer": {
 		display: block,
 	},
@@ -94,6 +98,9 @@ var defaultValuesMap = map[string]DefaultValues{
 		display: block,
 	},
 	"html": {
+		display: block,
+	},
+	"img": {
 		display: block,
 	},
 }
@@ -129,7 +136,7 @@ func containerFactory(e *TreeVertex) (fyne.CanvasObject, error) {
 
 		hyperLink := widget.NewHyperlink(e.Text.String(), linkValue)
 		return container.NewHBox(hyperLink), nil
-	case "div", "body", "header", "footer", "html":
+	case "div", "body", "header", "footer", "html", "main":
 		if e.Text.Len() == 0 {
 			return container.NewVBox(), nil
 		}
@@ -140,6 +147,14 @@ func containerFactory(e *TreeVertex) (fyne.CanvasObject, error) {
 	case "hr":
 		line := canvas.NewLine(TEXT_COLOR)
 		return container.NewHBox(line), nil
+	case "img":
+		imageURL, err := getURL(&e.Token)
+		if err != nil {
+			return container.NewWithoutLayout(), nil
+		}
+		image := canvas.NewImageFromURI(imageURL)
+		image.FillMode = canvas.ImageFillOriginal
+		return container.NewVBox(image), nil
 	default:
 		return container.NewWithoutLayout(), nil
 	}
@@ -161,4 +176,17 @@ func (token *HTMLToken) findHref() (*url.URL, error) {
 	}
 
 	return &url.URL{}, fmt.Errorf("anchor tag does not contain a reference")
+}
+
+func getURL(imageToken *HTMLToken) (fyne.URI, error) {
+	for _, attribute := range imageToken.Attributes {
+		if attribute.Name == "src" {
+			source, err := storage.ParseURI(attribute.Value)
+			if err != nil {
+				return source, err
+			}
+			return source, nil
+		}
+	}
+	panic("No url available")
 }
