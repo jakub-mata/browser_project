@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"image/color"
 	"net/url"
 
 	"fyne.io/fyne/v2"
@@ -12,6 +13,17 @@ import (
 )
 
 const DEFAULT_FONT_SIZE float32 = 16
+
+var BORDER_COLOR color.Gray16 = color.Black
+var TEXT_COLOR color.Gray16 = color.Black
+var PAGE_TITLE string = "Hello World"
+var CIRLCE_LIST_STROKEWIDTH int = 5
+
+type NumberGenerator struct {
+	currNumber int
+}
+
+var generator NumberGenerator = NumberGenerator{1}
 
 var headerSizes = map[string]float32{
 	"h1": 32,
@@ -55,10 +67,26 @@ func containerFactory(e *TreeVertex, parentContainer *fyne.Container) {
 	var currContainer *fyne.Container
 
 	switch e.Token.Name {
-	case "h1", "h2", "h3", "h4", "h5", "h6", "p", "li":
+	case "h1", "h2", "h3", "h4", "h5", "h6", "p":
 		label := canvas.NewText(e.Text.String(), TEXT_COLOR)
 		label.TextSize = getFontSize(e.Token.Name)
 		currContainer = container.NewVBox(label)
+	case "li":
+		label := canvas.NewText(e.Text.String(), TEXT_COLOR)
+		label.TextSize = getFontSize(e.Token.Name)
+
+		switch e.Parent.Token.Name {
+		case "ul":
+			circle := canvas.NewCircle(TEXT_COLOR)
+			circle.StrokeWidth = float32(CIRLCE_LIST_STROKEWIDTH)
+			currContainer = container.NewHBox(circle, label)
+		case "ol":
+			number := canvas.NewText(string(generator.currNumber), TEXT_COLOR)
+			generator.currNumber++
+			currContainer = container.NewHBox(number, label)
+		default:
+			currContainer = container.NewHBox(label)
+		}
 	case "a":
 		linkValue, err := e.Token.findHref()
 		if err == nil {

@@ -1,16 +1,10 @@
 package main
 
 import (
-	"image/color"
-
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/container"
 )
-
-var BORDER_COLOR color.Gray16 = color.Black
-var TEXT_COLOR color.Gray16 = color.Black
-var PAGE_TITLE string = "Hello World"
 
 func CreateViewer(root *TreeRoot) {
 	viewerApp := app.New()
