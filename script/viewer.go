@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"image/color"
 
 	"fyne.io/fyne/v2"
@@ -15,10 +14,7 @@ var PAGE_TITLE string = "Hello World"
 
 func CreateViewer(root *TreeRoot) {
 	viewerApp := app.New()
-	mainContainer, err := root.Root.traverseParsingTree()
-	if err != nil {
-		fmt.Println("No page to display")
-	}
+	mainContainer := root.Root.traverseParsingTree()
 
 	window := viewerApp.NewWindow(PAGE_TITLE)
 	window.Resize(fyne.NewSize(800, 800))
@@ -28,30 +24,14 @@ func CreateViewer(root *TreeRoot) {
 	viewerApp.Run()
 }
 
-func (root *TreeVertex) traverseParsingTree() (fyne.CanvasObject, error) {
-
-	//Recursion
-	var childContainers []fyne.CanvasObject
-	for _, child := range root.Children {
-		cc, err := child.traverseParsingTree()
-		if err == nil {
-			childContainers = append(childContainers, cc)
-		}
-	}
-	//Node itself
-
-	if root.Token.Name == "title" {
-		PAGE_TITLE = root.Text.String()
-	}
-
-	rootContainer, err := containerFactory(root)
-	if err != nil {
-		return rootContainer, err
-	}
-
-	baseContainer := container.NewVBox(
-		rootContainer,
-		container.NewVBox(childContainers...),
-	)
-	return baseContainer, nil
+func (root *TreeVertex) traverseParsingTree() *fyne.Container {
+	baseContainer := container.NewVBox()
+	containerFactory(root, baseContainer)
+	return baseContainer
 }
+
+/*
+func isAList(name string) bool {
+	return (name == "ul") || (name == "ol")
+}
+*/

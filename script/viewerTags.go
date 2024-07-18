@@ -11,153 +11,95 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-type DisplayValue int8
+const DEFAULT_FONT_SIZE float32 = 16
 
-const (
-	block DisplayValue = iota
-	inline
-	inlineBlock
-	none
-)
-
-type DefaultValues struct {
-	fontSize  float32
-	fontStyle fyne.TextStyle
-	textAlign fyne.TextAlign
-	display   DisplayValue
+var headerSizes = map[string]float32{
+	"h1": 32,
+	"h2": 24,
+	"h3": 18.72,
+	"h4": 16,
+	"h5": 13.28,
+	"h6": 10.72,
 }
 
-var defaultValuesMap = map[string]DefaultValues{
-	"p": {
-		fontSize:  16,
-		textAlign: fyne.TextAlignLeading,
-		display:   block,
-	},
-	"h1": {
-		fontSize: 32,
-		display:  block,
-	},
-	"h2": {
-		fontSize: 24,
-		display:  block,
-	},
-	"h3": {
-		fontSize: 18.72,
-		display:  block,
-	},
-	"h4": {
-		fontSize: 16,
-		display:  block,
-	},
-	"h5": {
-		fontSize: 13.28,
-		display:  block,
-	},
-	"h6": {
-		fontSize: 10.72,
-		display:  block,
-	},
-	"em": {
-		fontStyle: fyne.TextStyle{Bold: true},
-		display:   inline,
-	},
-	"a": {
-		display: inline,
-	},
-	"div": {
-		display: block,
-	},
-	"head": {
-		display: none,
-	},
-	"title": {
-		display: none,
-	},
-	"link": {
-		display: none,
-	},
-	"meta": {
-		display: none,
-	},
-	"br": {
-		display: block,
-	},
-	"hr": {
-		display: block,
-	},
-	"body": {
-		display: block,
-	},
-	"main": {
-		display: block,
-	},
-	"footer": {
-		display: block,
-	},
-	"header": {
-		display: block,
-	},
-	"html": {
-		display: block,
-	},
-	"img": {
-		display: block,
-	},
+func isMeta(tag string) bool {
+	metaTags := [...]string{
+		"meta", "head", "title",
+	}
+	for _, metaTag := range metaTags {
+		if metaTag == tag {
+			return true
+		}
+	}
+	return false
 }
 
-func getDefaults(name string) (DefaultValues, bool) {
-	res, err := defaultValuesMap[name]
-	return res, err
+func getFontSize(name string) float32 {
+	res, ok := headerSizes[name]
+	if ok {
+		return res
+	} else {
+		return DEFAULT_FONT_SIZE
+	}
 }
 
-func containerFactory(e *TreeVertex) (fyne.CanvasObject, error) {
-	defaultValues, included := getDefaults(e.Token.Name)
+func containerFactory(e *TreeVertex, parentContainer *fyne.Container) {
 
-	if !included {
-		return container.NewHBox(
-			widget.NewLabel(e.Token.Name),
-		), nil
+	if isMeta(e.Token.Name) {
+		if e.Token.Name == "title" {
+			PAGE_TITLE = e.Text.String()
+		}
+		return
 	}
 
-	if defaultValues.display == none {
-		return container.NewWithoutLayout(), fmt.Errorf("no display value")
-	}
+	var currContainer *fyne.Container
 
 	switch e.Token.Name {
-	case "h1", "h2", "h3", "h4", "h5", "h6", "p":
+	case "h1", "h2", "h3", "h4", "h5", "h6", "p", "li":
 		label := canvas.NewText(e.Text.String(), TEXT_COLOR)
-		label.TextSize = defaultValues.fontSize
-		return container.NewHBox(label), nil
+		label.TextSize = getFontSize(e.Token.Name)
+		currContainer = container.NewVBox(label)
 	case "a":
 		linkValue, err := e.Token.findHref()
-		if err != nil {
-			return container.NewWithoutLayout(), err
+		if err == nil {
+			hyperLink := widget.NewHyperlink(e.Text.String(), linkValue)
+			currContainer = container.NewVBox(hyperLink)
 		}
-
-		hyperLink := widget.NewHyperlink(e.Text.String(), linkValue)
-		return container.NewHBox(hyperLink), nil
-	case "div", "body", "header", "footer", "html", "main":
+	case "div", "body", "header", "footer", "html", "main", "span":
 		if e.Text.Len() == 0 {
-			return container.NewVBox(), nil
+			break
 		}
 		label := canvas.NewText(e.Text.String(), TEXT_COLOR)
-		return container.NewVBox(label), nil
+		currContainer = container.NewVBox(label)
 	case "br":
-		return container.NewVBox(), nil
+
 	case "hr":
 		line := canvas.NewLine(TEXT_COLOR)
-		return container.NewHBox(line), nil
+		currContainer = container.NewVBox(line)
 	case "img":
 		imageURL, err := getURL(&e.Token)
 		if err != nil {
-			return container.NewWithoutLayout(), nil
+			break
 		}
 		image := canvas.NewImageFromURI(imageURL)
 		image.FillMode = canvas.ImageFillOriginal
-		return container.NewVBox(image), nil
+		currContainer = container.NewVBox(image)
+	case "ul", "ol":
+		currContainer = container.NewVBox()
 	default:
-		return container.NewWithoutLayout(), nil
+		w := widget.NewLabel(e.Token.Name)
+		currContainer = container.NewVBox(w)
 	}
+
+	if currContainer == nil {
+		currContainer = container.NewVBox()
+	}
+
+	for _, child := range e.Children {
+		containerFactory(child, currContainer)
+	}
+
+	parentContainer.Add(currContainer)
 }
 
 func (token *HTMLToken) findHref() (*url.URL, error) {
