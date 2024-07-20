@@ -25,10 +25,12 @@ func (tokenizer HTMLTokenizer) TokenizeHTML(printTokens bool) []HTMLToken {
 
 	for tokenizer.curr < len(tokenizer.input) {
 		currVal := tokenizer.input[tokenizer.curr]
-		fmt.Printf(string(currVal))
-		if tokenizer.curr%20 == 0 {
-			fmt.Printf("")
-		}
+		/*
+			fmt.Printf(string(currVal))
+			if tokenizer.curr%20 == 0 {
+				fmt.Printf("")
+			}
+		*/
 		switch tokenizer.state {
 		case Data:
 			switch currVal {

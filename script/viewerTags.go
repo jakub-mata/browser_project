@@ -14,16 +14,17 @@ import (
 
 const DEFAULT_FONT_SIZE float32 = 16
 
+type BOXTYPE int8
+
+const (
+	VBox BOXTYPE = iota
+	HBox
+)
+
 var BORDER_COLOR color.Gray16 = color.Black
 var TEXT_COLOR color.Gray16 = color.Black
 var PAGE_TITLE string = "Hello World"
-var CIRLCE_LIST_STROKEWIDTH int = 5
-
-type NumberGenerator struct {
-	currNumber int
-}
-
-var generator NumberGenerator = NumberGenerator{1}
+var CIRCLE_LIST_STROKEWIDTH int = 5
 
 var headerSizes = map[string]float32{
 	"h1": 32,
@@ -34,101 +35,118 @@ var headerSizes = map[string]float32{
 	"h6": 10.72,
 }
 
-func isMeta(tag string) bool {
-	metaTags := [...]string{
-		"meta", "head", "title",
-	}
-	for _, metaTag := range metaTags {
-		if metaTag == tag {
-			return true
-		}
-	}
-	return false
+var boxTypes = map[string]BOXTYPE{
+	"h1":     HBox,
+	"h2":     HBox,
+	"h3":     HBox,
+	"h4":     HBox,
+	"h5":     HBox,
+	"h6":     HBox,
+	"p":      HBox,
+	"li":     HBox,
+	"a":      HBox,
+	"img":    VBox,
+	"div":    VBox,
+	"span":   VBox,
+	"ul":     VBox,
+	"ol":     VBox,
+	"body":   VBox,
+	"header": VBox,
+	"footer": VBox,
+	"html":   VBox,
+	"main":   VBox,
+	"br":     VBox,
+	"hr":     VBox,
 }
 
-func getFontSize(name string) float32 {
-	res, ok := headerSizes[name]
-	if ok {
-		return res
+func containerFactory(element *TreeVertex) (fyne.CanvasObject, bool) {
+
+	var subObjects []fyne.CanvasObject
+
+	//handling root
+	if isMeta(element.Token.Name) {
+		if element.Token.Name == "title" {
+			PAGE_TITLE = element.Text.String()
+		}
 	} else {
-		return DEFAULT_FONT_SIZE
-	}
-}
 
-func containerFactory(e *TreeVertex, parentContainer *fyne.Container) {
+		switch element.Token.Name {
+		case "h1", "h2", "h3", "h4", "h5", "h6", "p":
+			label := canvas.NewText(element.Text.String(), TEXT_COLOR)
+			label.TextSize = getFontSize(element.Token.Name)
+			subObjects = append(subObjects, label)
+		case "li":
+			label := canvas.NewText(element.Text.String(), TEXT_COLOR)
+			label.TextSize = getFontSize(element.Token.Name)
 
-	if isMeta(e.Token.Name) {
-		if e.Token.Name == "title" {
-			PAGE_TITLE = e.Text.String()
-		}
-		return
-	}
-
-	var currContainer *fyne.Container
-
-	switch e.Token.Name {
-	case "h1", "h2", "h3", "h4", "h5", "h6", "p":
-		label := canvas.NewText(e.Text.String(), TEXT_COLOR)
-		label.TextSize = getFontSize(e.Token.Name)
-		currContainer = container.NewVBox(label)
-	case "li":
-		label := canvas.NewText(e.Text.String(), TEXT_COLOR)
-		label.TextSize = getFontSize(e.Token.Name)
-
-		switch e.Parent.Token.Name {
-		case "ul":
-			circle := canvas.NewCircle(TEXT_COLOR)
-			circle.StrokeWidth = float32(CIRLCE_LIST_STROKEWIDTH)
-			currContainer = container.NewHBox(circle, label)
-		case "ol":
-			number := canvas.NewText(string(generator.currNumber), TEXT_COLOR)
-			generator.currNumber++
-			currContainer = container.NewHBox(number, label)
+			switch element.Parent.Token.Name {
+			case "ul":
+				circle := canvas.NewCircle(TEXT_COLOR)
+				circle.StrokeWidth = float32(CIRCLE_LIST_STROKEWIDTH)
+				subObjects = append(subObjects, circle, label)
+			default:
+				subObjects = append(subObjects, label)
+			}
+		case "a":
+			linkValue, err := element.Token.findHref()
+			if err != nil {
+				break
+			}
+			hyperLink := widget.NewHyperlink(element.Text.String(), linkValue)
+			subObjects = append(subObjects, hyperLink)
+		case "div", "body", "header", "footer", "html", "main", "span":
+			if element.Text.Len() == 0 {
+				break
+			}
+			label := canvas.NewText(element.Text.String(), TEXT_COLOR)
+			subObjects = append(subObjects, label)
+		case "br":
+			break
+		case "hr":
+			line := canvas.NewLine(TEXT_COLOR)
+			subObjects = append(subObjects, line)
+		case "img":
+			imageURL, err := getURL(&element.Token)
+			if err != nil {
+				break
+			}
+			image := canvas.NewImageFromURI(imageURL)
+			image.FillMode = canvas.ImageFillOriginal
+			subObjects = append(subObjects, image)
+		case "ul", "ol":
+			break
 		default:
-			currContainer = container.NewHBox(label)
+			w := widget.NewLabel(element.Token.Name)
+			subObjects = append(subObjects, w)
 		}
-	case "a":
-		linkValue, err := e.Token.findHref()
-		if err == nil {
-			hyperLink := widget.NewHyperlink(e.Text.String(), linkValue)
-			currContainer = container.NewVBox(hyperLink)
-		}
-	case "div", "body", "header", "footer", "html", "main", "span":
-		if e.Text.Len() == 0 {
-			break
-		}
-		label := canvas.NewText(e.Text.String(), TEXT_COLOR)
-		currContainer = container.NewVBox(label)
-	case "br":
-
-	case "hr":
-		line := canvas.NewLine(TEXT_COLOR)
-		currContainer = container.NewVBox(line)
-	case "img":
-		imageURL, err := getURL(&e.Token)
-		if err != nil {
-			break
-		}
-		image := canvas.NewImageFromURI(imageURL)
-		image.FillMode = canvas.ImageFillOriginal
-		currContainer = container.NewVBox(image)
-	case "ul", "ol":
-		currContainer = container.NewVBox()
-	default:
-		w := widget.NewLabel(e.Token.Name)
-		currContainer = container.NewVBox(w)
 	}
 
-	if currContainer == nil {
-		currContainer = container.NewVBox()
+	//recursion
+	for _, child := range element.Children {
+		subContainer, ok := containerFactory(child)
+		if !ok {
+			return container.NewWithoutLayout(), false
+		}
+		subObjects = append(subObjects, subContainer)
 	}
 
-	for _, child := range e.Children {
-		containerFactory(child, currContainer)
+	//returning
+	boxType, ok := boxTypes[element.Token.Name]
+	if !ok {
+		base := container.NewVBox(subObjects...)
+		return base, true
+	}
+	if boxType == VBox {
+		base := container.NewVBox(subObjects...)
+		return base, true
+	} else {
+		base := container.NewHBox(subObjects...)
+		return base, true
 	}
 
-	parentContainer.Add(currContainer)
 }
+
+//HELPER FUNCTIONS
 
 func (token *HTMLToken) findHref() (*url.URL, error) {
 	if token.Name != "a" {
@@ -159,4 +177,25 @@ func getURL(imageToken *HTMLToken) (fyne.URI, error) {
 		}
 	}
 	panic("No url available")
+}
+
+func isMeta(tag string) bool {
+	metaTags := [...]string{
+		"meta", "head", "title",
+	}
+	for _, metaTag := range metaTags {
+		if metaTag == tag {
+			return true
+		}
+	}
+	return false
+}
+
+func getFontSize(name string) float32 {
+	res, ok := headerSizes[name]
+	if ok {
+		return res
+	} else {
+		return DEFAULT_FONT_SIZE
+	}
 }

@@ -8,7 +8,11 @@ import (
 
 func CreateViewer(root *TreeRoot) {
 	viewerApp := app.New()
-	mainContainer := root.Root.traverseParsingTree()
+	mainContainer, ok := root.Root.traverseParsingTree()
+
+	if !ok {
+		panic("no content")
+	}
 
 	window := viewerApp.NewWindow(PAGE_TITLE)
 	window.Resize(fyne.NewSize(800, 800))
@@ -18,14 +22,19 @@ func CreateViewer(root *TreeRoot) {
 	viewerApp.Run()
 }
 
-func (root *TreeVertex) traverseParsingTree() *fyne.Container {
-	baseContainer := container.NewVBox()
-	containerFactory(root, baseContainer)
-	return baseContainer
-}
+func (root *TreeVertex) traverseParsingTree() (*fyne.Container, bool) {
+	var subObjects []fyne.CanvasObject
+	for _, child := range root.Children {
+		subContainer, ok := containerFactory(child)
+		if !ok {
+			continue
+		}
+		subObjects = append(subObjects, subContainer)
+	}
+	if len(subObjects) == 0 {
+		return container.NewWithoutLayout(), false
+	}
 
-/*
-func isAList(name string) bool {
-	return (name == "ul") || (name == "ol")
+	baseContainer := container.NewVBox(subObjects...)
+	return baseContainer, true
 }
-*/

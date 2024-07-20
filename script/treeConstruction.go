@@ -60,7 +60,7 @@ func buildParseTree(tokens []HTMLToken, printParser bool) (*TreeRoot, error) {
 
 func printTree(root TreeVertex, depth int) {
 	for i := 0; i < depth; i++ {
-		fmt.Printf(" ")
+		fmt.Printf("  ")
 	}
 	fmt.Printf("Name: %s, Text: %s", root.Token.Name, &root.Text)
 	fmt.Println()
