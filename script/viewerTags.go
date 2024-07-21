@@ -65,12 +65,19 @@ func containerFactory(element *TreeVertex) (fyne.CanvasObject, bool) {
 
 	if element.Token.Type == Character {
 		switch element.Parent.Token.Name {
-		case "h1", "h2", "h3", "h4", "h5", "h6", "p", "ul", "ol":
+		case "h1", "h2", "h3", "h4", "h5", "h6", "p", "ul", "ol", "strong", "em":
 			if element.Token.Content.Len() == 0 {
 				break
 			}
 			label := canvas.NewText(element.Token.Content.String(), TEXT_COLOR)
-			label.TextSize = getFontSize(element.Token.Name)
+			label.TextSize = getFontSize(element.Parent.Token.Name)
+			if element.Parent.Token.Name == "strong" {
+				label.TextStyle.Bold = true
+			}
+			if element.Parent.Token.Name == "em" {
+				label.TextStyle.Italic = true
+			}
+
 			subObjects = append(subObjects, label)
 		case "li":
 			label := canvas.NewText(element.Token.Content.String(), TEXT_COLOR)
@@ -114,10 +121,6 @@ func containerFactory(element *TreeVertex) (fyne.CanvasObject, bool) {
 		case "hr":
 			line := canvas.NewLine(TEXT_COLOR)
 			subObjects = append(subObjects, line)
-
-		default:
-			label := canvas.NewText(element.Token.Name, TEXT_COLOR)
-			subObjects = append(subObjects, label)
 		}
 	}
 	/*
