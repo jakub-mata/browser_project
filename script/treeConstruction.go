@@ -2,13 +2,11 @@ package main
 
 import (
 	"fmt"
-	"strings"
 )
 
 type TreeVertex struct {
 	Token    HTMLToken
 	Children []*TreeVertex
-	Text     strings.Builder
 	Parent   *TreeVertex
 }
 
@@ -17,7 +15,7 @@ type TreeRoot struct {
 }
 
 func createRoot(rootToken HTMLToken) TreeRoot {
-	return TreeRoot{&TreeVertex{rootToken, nil, strings.Builder{}, nil}}
+	return TreeRoot{&TreeVertex{rootToken, nil, nil}}
 }
 
 func findComplementaryOpenTag(node *TreeVertex, name string) *TreeVertex {
@@ -36,7 +34,7 @@ func buildParseTree(tokens []HTMLToken, printParser bool) (*TreeRoot, error) {
 		token := tokens[i]
 		switch token.Type {
 		case StartTag, DOCTYPE:
-			child := TreeVertex{token, nil, strings.Builder{}, currentNode}
+			child := TreeVertex{token, nil, currentNode}
 			currentNode.Children = append(currentNode.Children, &child)
 			if !child.Token.SelfClosingFlag {
 				currentNode = &child
@@ -46,7 +44,8 @@ func buildParseTree(tokens []HTMLToken, printParser bool) (*TreeRoot, error) {
 		case CommentType:
 			//ignore
 		case Character:
-			currentNode.Text.WriteString(token.Content.String())
+			child := TreeVertex{token, nil, currentNode}
+			currentNode.Children = append(currentNode.Children, &child)
 		case EOF:
 			return &root, nil
 		}
@@ -62,7 +61,11 @@ func printTree(root TreeVertex, depth int) {
 	for i := 0; i < depth; i++ {
 		fmt.Printf("  ")
 	}
-	fmt.Printf("Name: %s, Text: %s", root.Token.Name, &root.Text)
+	if root.Token.Type == Character {
+		fmt.Printf("Name: %s, Text: %s", root.Token.Name, &root.Token.Content)
+	} else {
+		fmt.Printf("Name: %s", root.Token.Name)
+	}
 	fmt.Println()
 
 	for _, child := range root.Children {

@@ -24,7 +24,7 @@ const (
 var BORDER_COLOR color.Gray16 = color.Black
 var TEXT_COLOR color.Gray16 = color.Black
 var PAGE_TITLE string = "Hello World"
-var CIRCLE_LIST_STROKEWIDTH int = 5
+var CIRCLE_LIST_STROKEWIDTH int = 10
 
 var headerSizes = map[string]float32{
 	"h1": 32,
@@ -63,23 +63,20 @@ func containerFactory(element *TreeVertex) (fyne.CanvasObject, bool) {
 
 	var subObjects []fyne.CanvasObject
 
-	//handling root
-	if isMeta(element.Token.Name) {
-		if element.Token.Name == "title" {
-			PAGE_TITLE = element.Text.String()
-		}
-	} else {
-
-		switch element.Token.Name {
-		case "h1", "h2", "h3", "h4", "h5", "h6", "p":
-			label := canvas.NewText(element.Text.String(), TEXT_COLOR)
+	if element.Token.Type == Character {
+		switch element.Parent.Token.Name {
+		case "h1", "h2", "h3", "h4", "h5", "h6", "p", "ul", "ol":
+			if element.Token.Content.Len() == 0 {
+				break
+			}
+			label := canvas.NewText(element.Token.Content.String(), TEXT_COLOR)
 			label.TextSize = getFontSize(element.Token.Name)
 			subObjects = append(subObjects, label)
 		case "li":
-			label := canvas.NewText(element.Text.String(), TEXT_COLOR)
+			label := canvas.NewText(element.Token.Content.String(), TEXT_COLOR)
 			label.TextSize = getFontSize(element.Token.Name)
 
-			switch element.Parent.Token.Name {
+			switch element.Parent.Parent.Token.Name {
 			case "ul":
 				circle := canvas.NewCircle(TEXT_COLOR)
 				circle.StrokeWidth = float32(CIRCLE_LIST_STROKEWIDTH)
@@ -88,23 +85,23 @@ func containerFactory(element *TreeVertex) (fyne.CanvasObject, bool) {
 				subObjects = append(subObjects, label)
 			}
 		case "a":
-			linkValue, err := element.Token.findHref()
+			linkValue, err := element.Parent.Token.findHref()
 			if err != nil {
 				break
 			}
-			hyperLink := widget.NewHyperlink(element.Text.String(), linkValue)
+			hyperLink := widget.NewHyperlink(element.Token.Content.String(), linkValue)
 			subObjects = append(subObjects, hyperLink)
+		case "title":
+			PAGE_TITLE = element.Token.Content.String()
 		case "div", "body", "header", "footer", "html", "main", "span":
-			if element.Text.Len() == 0 {
+			if element.Token.Content.Len() == 0 {
 				break
 			}
-			label := canvas.NewText(element.Text.String(), TEXT_COLOR)
+			label := canvas.NewText(element.Token.Content.String(), TEXT_COLOR)
 			subObjects = append(subObjects, label)
-		case "br":
-			break
-		case "hr":
-			line := canvas.NewLine(TEXT_COLOR)
-			subObjects = append(subObjects, line)
+		}
+	} else {
+		switch element.Token.Name {
 		case "img":
 			imageURL, err := getURL(&element.Token)
 			if err != nil {
@@ -113,13 +110,79 @@ func containerFactory(element *TreeVertex) (fyne.CanvasObject, bool) {
 			image := canvas.NewImageFromURI(imageURL)
 			image.FillMode = canvas.ImageFillOriginal
 			subObjects = append(subObjects, image)
-		case "ul", "ol":
-			break
+		case "br":
+		case "hr":
+			line := canvas.NewLine(TEXT_COLOR)
+			subObjects = append(subObjects, line)
+
 		default:
-			w := widget.NewLabel(element.Token.Name)
-			subObjects = append(subObjects, w)
+			label := canvas.NewText(element.Token.Name, TEXT_COLOR)
+			subObjects = append(subObjects, label)
 		}
 	}
+	/*
+		//handling root
+		if isMeta(element.Token.Name) {
+			if element.Token.Name == "title" {
+				PAGE_TITLE = element.Text.String()
+			}
+		} else if element.Token.Type == Character {
+			label := canvas.NewText(element.Token.Content.String(), TEXT_COLOR)
+			subObjects = append(subObjects, label)
+		} else {
+
+			switch element.Token.Name {
+			case "h1", "h2", "h3", "h4", "h5", "h6", "p", "ul", "ol":
+				if len(element.Text.String()) == 0 {
+					break
+				}
+				label := canvas.NewText(element.Text.String(), TEXT_COLOR)
+				label.TextSize = getFontSize(element.Token.Name)
+				subObjects = append(subObjects, label)
+			case "li":
+				label := canvas.NewText(element.Text.String(), TEXT_COLOR)
+				label.TextSize = getFontSize(element.Token.Name)
+
+				switch element.Parent.Token.Name {
+				case "ul":
+					circle := canvas.NewCircle(TEXT_COLOR)
+					circle.StrokeWidth = float32(CIRCLE_LIST_STROKEWIDTH)
+					subObjects = append(subObjects, circle, label)
+				default:
+					subObjects = append(subObjects, label)
+				}
+			case "a":
+				linkValue, err := element.Token.findHref()
+			if err != nil {
+				break
+			}
+			hyperLink := widget.NewHyperlink(element.Text.String(), linkValue)
+			subObjects = append(subObjects, hyperLink)
+			case "div", "body", "header", "footer", "html", "main", "span":
+				if element.Text.Len() == 0 {
+					break
+				}
+				label := canvas.NewText(element.Text.String(), TEXT_COLOR)
+				subObjects = append(subObjects, label)
+			case "br":
+				break
+			case "hr":
+				line := canvas.NewLine(TEXT_COLOR)
+				subObjects = append(subObjects, line)
+			case "img":
+				imageURL, err := getURL(&element.Token)
+				if err != nil {
+					break
+				}
+				image := canvas.NewImageFromURI(imageURL)
+				image.FillMode = canvas.ImageFillOriginal
+				subObjects = append(subObjects, image)
+			default:
+				w := widget.NewLabel(element.Token.Name)
+				subObjects = append(subObjects, w)
+			}
+		}
+	*/
 
 	//recursion
 	for _, child := range element.Children {
@@ -133,7 +196,7 @@ func containerFactory(element *TreeVertex) (fyne.CanvasObject, bool) {
 	//returning
 	boxType, ok := boxTypes[element.Token.Name]
 	if !ok {
-		base := container.NewVBox(subObjects...)
+		base := container.NewHBox(subObjects...)
 		return base, true
 	}
 	if boxType == VBox {
@@ -149,9 +212,6 @@ func containerFactory(element *TreeVertex) (fyne.CanvasObject, bool) {
 //HELPER FUNCTIONS
 
 func (token *HTMLToken) findHref() (*url.URL, error) {
-	if token.Name != "a" {
-		return &url.URL{}, fmt.Errorf("not an anchor tag")
-	}
 
 	for _, attr := range token.Attributes {
 		if attr.Name == "href" {
