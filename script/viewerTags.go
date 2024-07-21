@@ -118,6 +118,8 @@ func containerFactory(element *TreeVertex) (fyne.CanvasObject, bool) {
 			image.FillMode = canvas.ImageFillOriginal
 			subObjects = append(subObjects, image)
 		case "br":
+			newline := canvas.NewText("\n", TEXT_COLOR)
+			subObjects = append(subObjects, newline)
 		case "hr":
 			line := canvas.NewLine(TEXT_COLOR)
 			subObjects = append(subObjects, line)
