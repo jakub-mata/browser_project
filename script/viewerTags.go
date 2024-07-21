@@ -125,69 +125,6 @@ func containerFactory(element *TreeVertex) (fyne.CanvasObject, bool) {
 			subObjects = append(subObjects, line)
 		}
 	}
-	/*
-		//handling root
-		if isMeta(element.Token.Name) {
-			if element.Token.Name == "title" {
-				PAGE_TITLE = element.Text.String()
-			}
-		} else if element.Token.Type == Character {
-			label := canvas.NewText(element.Token.Content.String(), TEXT_COLOR)
-			subObjects = append(subObjects, label)
-		} else {
-
-			switch element.Token.Name {
-			case "h1", "h2", "h3", "h4", "h5", "h6", "p", "ul", "ol":
-				if len(element.Text.String()) == 0 {
-					break
-				}
-				label := canvas.NewText(element.Text.String(), TEXT_COLOR)
-				label.TextSize = getFontSize(element.Token.Name)
-				subObjects = append(subObjects, label)
-			case "li":
-				label := canvas.NewText(element.Text.String(), TEXT_COLOR)
-				label.TextSize = getFontSize(element.Token.Name)
-
-				switch element.Parent.Token.Name {
-				case "ul":
-					circle := canvas.NewCircle(TEXT_COLOR)
-					circle.StrokeWidth = float32(CIRCLE_LIST_STROKEWIDTH)
-					subObjects = append(subObjects, circle, label)
-				default:
-					subObjects = append(subObjects, label)
-				}
-			case "a":
-				linkValue, err := element.Token.findHref()
-			if err != nil {
-				break
-			}
-			hyperLink := widget.NewHyperlink(element.Text.String(), linkValue)
-			subObjects = append(subObjects, hyperLink)
-			case "div", "body", "header", "footer", "html", "main", "span":
-				if element.Text.Len() == 0 {
-					break
-				}
-				label := canvas.NewText(element.Text.String(), TEXT_COLOR)
-				subObjects = append(subObjects, label)
-			case "br":
-				break
-			case "hr":
-				line := canvas.NewLine(TEXT_COLOR)
-				subObjects = append(subObjects, line)
-			case "img":
-				imageURL, err := getURL(&element.Token)
-				if err != nil {
-					break
-				}
-				image := canvas.NewImageFromURI(imageURL)
-				image.FillMode = canvas.ImageFillOriginal
-				subObjects = append(subObjects, image)
-			default:
-				w := widget.NewLabel(element.Token.Name)
-				subObjects = append(subObjects, w)
-			}
-		}
-	*/
 
 	//recursion
 	for _, child := range element.Children {
