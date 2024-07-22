@@ -16,9 +16,12 @@ const DEFAULT_FONT_SIZE float32 = 16
 
 type BOXTYPE int8
 
+type leftAlignLayout struct{}
+
 const (
 	VBox BOXTYPE = iota
 	HBox
+	leftAlign
 )
 
 var BORDER_COLOR color.Gray16 = color.Black
@@ -45,7 +48,7 @@ var boxTypes = map[string]BOXTYPE{
 	"p":      HBox,
 	"li":     HBox,
 	"a":      HBox,
-	"img":    VBox,
+	"img":    leftAlign,
 	"div":    VBox,
 	"span":   VBox,
 	"ul":     VBox,
@@ -144,6 +147,9 @@ func containerFactory(element *TreeVertex) (fyne.CanvasObject, bool) {
 	if boxType == VBox {
 		base := container.NewVBox(subObjects...)
 		return base, true
+	} else if boxType == leftAlign {
+		base := container.New(leftAlignLayout{}, subObjects...)
+		return base, true
 	} else {
 		base := container.NewHBox(subObjects...)
 		return base, true
@@ -181,18 +187,6 @@ func getURL(imageToken *HTMLToken) (fyne.URI, error) {
 	panic("No url available")
 }
 
-func isMeta(tag string) bool {
-	metaTags := [...]string{
-		"meta", "head", "title",
-	}
-	for _, metaTag := range metaTags {
-		if metaTag == tag {
-			return true
-		}
-	}
-	return false
-}
-
 func getFontSize(name string) float32 {
 	res, ok := headerSizes[name]
 	if ok {
@@ -200,4 +194,28 @@ func getFontSize(name string) float32 {
 	} else {
 		return DEFAULT_FONT_SIZE
 	}
+}
+
+func (l leftAlignLayout) MinSize(objects []fyne.CanvasObject) fyne.Size {
+	// Calculate the minimum size based on the objects
+	minSize := fyne.NewSize(0, 0)
+	for _, obj := range objects {
+		minSize = minSize.Max(obj.MinSize())
+	}
+	return minSize
+}
+
+func (l leftAlignLayout) Layout(objects []fyne.CanvasObject, containerSize fyne.Size) {
+	// Position each object starting from the top-left corner
+	pos := fyne.NewPos(0, 0)
+	for _, obj := range objects {
+		size := obj.MinSize()
+		obj.Move(pos)
+		obj.Resize(size)
+		pos = pos.Add(fyne.NewDelta(size.Width, 0)) // Move right for next object
+	}
+}
+
+func (l leftAlignLayout) ApplyLayout(objects []fyne.CanvasObject, containerSize fyne.Size) {
+	l.Layout(objects, containerSize)
 }
