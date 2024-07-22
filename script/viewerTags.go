@@ -88,8 +88,9 @@ func containerFactory(element *TreeVertex) (fyne.CanvasObject, bool) {
 
 			switch element.Parent.Parent.Token.Name {
 			case "ul":
-				circle := canvas.NewCircle(TEXT_COLOR)
-				circle.StrokeWidth = float32(CIRCLE_LIST_STROKEWIDTH)
+				//circle := canvas.NewCircle(TEXT_COLOR)
+				//circle.StrokeWidth = float32(CIRCLE_LIST_STROKEWIDTH)
+				circle := canvas.NewText("\u2218", TEXT_COLOR)
 				subObjects = append(subObjects, circle, label)
 			default:
 				subObjects = append(subObjects, label)
