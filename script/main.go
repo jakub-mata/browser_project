@@ -6,6 +6,7 @@ var printTokens bool = false
 var printParser bool = false
 
 func main() {
+	startCLI()
 	body, err := httpClient("http://0.0.0.0:8080/") //run python3 http.server 8080
 	if err != nil {
 		panic(err)
