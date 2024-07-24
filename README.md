@@ -11,9 +11,23 @@ The browser is basically a simple HTML viewer. As of now, the supported tags inc
 
 Only essential tag attributes are supported, e.g. *href* for anchor tags. Style tags (used for CSS styling) inside HTML tag elements are not supported.
 
+## Support
+The program should run on all platforms supported by [Fyne.io](https://fyne.io/) (including Linux, Windows, and MacOS). 
+
 ## Installation
 
 ## Usage
+You can view a webpage by using this command:
+```
+dora -web *websiteAddress*
+```
+The address has to be precise. There are two additional flags you can use for debugging.
+
+`-log-tokens` prints out the result of the tokenization stage to the terminal
+
+`-log-parser` prints out the result of the parsing and tree construction stage
+
+After you call the main command, a new window will pop up and display the desired web page.
 
 ## Developer information
 Based on the provided web address, a client sends a get request. The web client is created from Go's standard library.
