@@ -8,6 +8,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/storage"
 	"fyne.io/fyne/v2/widget"
 )
@@ -38,28 +39,28 @@ var headerSizes = map[string]float32{
 	"h6": 10.72,
 }
 
-var boxTypes = map[string]BOXTYPE{
-	"h1":     HBox,
-	"h2":     HBox,
-	"h3":     HBox,
-	"h4":     HBox,
-	"h5":     HBox,
-	"h6":     HBox,
-	"p":      HBox,
-	"li":     HBox,
-	"a":      HBox,
-	"img":    leftAlign,
-	"div":    VBox,
-	"span":   VBox,
-	"ul":     VBox,
-	"ol":     VBox,
-	"body":   VBox,
-	"header": VBox,
-	"footer": VBox,
-	"html":   VBox,
-	"main":   VBox,
-	"br":     VBox,
-	"hr":     VBox,
+var boxTypes = map[string]fyne.Layout{
+	"h1":     layout.NewHBoxLayout(),
+	"h2":     layout.NewHBoxLayout(),
+	"h3":     layout.NewHBoxLayout(),
+	"h4":     layout.NewHBoxLayout(),
+	"h5":     layout.NewHBoxLayout(),
+	"h6":     layout.NewHBoxLayout(),
+	"p":      layout.NewHBoxLayout(),
+	"li":     layout.NewHBoxLayout(),
+	"a":      layout.NewHBoxLayout(),
+	"img":    leftAlignLayout{},
+	"div":    layout.NewVBoxLayout(),
+	"span":   layout.NewVBoxLayout(),
+	"ul":     layout.NewVBoxLayout(),
+	"ol":     layout.NewVBoxLayout(),
+	"body":   layout.NewVBoxLayout(),
+	"header": layout.NewVBoxLayout(),
+	"footer": layout.NewVBoxLayout(),
+	"html":   layout.NewVBoxLayout(),
+	"main":   layout.NewVBoxLayout(),
+	"br":     layout.NewVBoxLayout(),
+	"hr":     layout.NewVBoxLayout(),
 }
 
 func containerFactory(element *TreeVertex) (fyne.CanvasObject, bool) {
@@ -145,23 +146,17 @@ func containerFactory(element *TreeVertex) (fyne.CanvasObject, bool) {
 	}
 
 	//returning
-	boxType, ok := boxTypes[element.Token.Name]
+	layoutType, ok := boxTypes[element.Token.Name]
 	if !ok {
-		base := container.NewHBox(subObjects...)
-		return base, true
-	}
-	if boxType == VBox {
 		base := container.NewVBox(subObjects...)
-		return base, true
-	} else if boxType == leftAlign {
-		base := container.New(leftAlignLayout{}, subObjects...)
-		imagesToFetch[len(imagesToFetch)-1].parentContainer = base
-		return base, true
-	} else {
-		base := container.NewHBox(subObjects...)
 		return base, true
 	}
 
+	base := container.New(layoutType, subObjects...)
+	if element.Token.Name == "img" {
+		imagesToFetch[len(imagesToFetch)-1].parentContainer = base
+	}
+	return base, true
 }
 
 //HELPER FUNCTIONS
@@ -201,12 +196,6 @@ func getFontSize(name string) float32 {
 	} else {
 		return DEFAULT_FONT_SIZE
 	}
-}
-
-func findAndAppendImage(imageURL fyne.URI, subObjects *[]fyne.CanvasObject) {
-	image := canvas.NewImageFromURI(imageURL)
-	image.FillMode = canvas.ImageFillOriginal
-	*subObjects = append(*subObjects, image)
 }
 
 func (l leftAlignLayout) MinSize(objects []fyne.CanvasObject) fyne.Size {
