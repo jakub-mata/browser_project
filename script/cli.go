@@ -5,9 +5,9 @@ import (
 	"fmt"
 )
 
-var defaultSite string = "http://0.0.0.0:8080/"
+var defaultSite string = "http://0.0.0.0:8063/"
 
-func startCLI() {
+func startCLI() (bool, bool, string) {
 	logTokensBool := flag.Bool("log-tokens", false, "Logs tokenizer's output")
 	logParserBool := flag.Bool("log-parser", true, "Logs constructed parsing tree")
 	websiteToFetch := flag.String("address", defaultSite, "The web address to search")
@@ -15,4 +15,5 @@ func startCLI() {
 	fmt.Println("tokens:", *logTokensBool)
 	fmt.Println("parser:", *logParserBool)
 	fmt.Println("website:", *websiteToFetch)
+	return *logTokensBool, *logParserBool, *websiteToFetch
 }
