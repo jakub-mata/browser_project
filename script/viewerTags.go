@@ -118,9 +118,14 @@ func containerFactory(element *TreeVertex) (fyne.CanvasObject, bool) {
 			if err != nil {
 				break
 			}
-			image := canvas.NewImageFromURI(imageURL)
-			image.FillMode = canvas.ImageFillOriginal
-			subObjects = append(subObjects, image)
+			square := canvas.NewRectangle(BORDER_COLOR)
+			subObjects = append(subObjects, square)
+			img := ImageFetch{
+				url:         imageURL,
+				placeholder: square,
+			}
+			imagesToFetch = append(imagesToFetch, img)
+
 		case "br":
 			newline := canvas.NewText("\n", TEXT_COLOR)
 			subObjects = append(subObjects, newline)
@@ -150,6 +155,7 @@ func containerFactory(element *TreeVertex) (fyne.CanvasObject, bool) {
 		return base, true
 	} else if boxType == leftAlign {
 		base := container.New(leftAlignLayout{}, subObjects...)
+		imagesToFetch[len(imagesToFetch)-1].parentContainer = base
 		return base, true
 	} else {
 		base := container.NewHBox(subObjects...)
@@ -195,6 +201,12 @@ func getFontSize(name string) float32 {
 	} else {
 		return DEFAULT_FONT_SIZE
 	}
+}
+
+func findAndAppendImage(imageURL fyne.URI, subObjects *[]fyne.CanvasObject) {
+	image := canvas.NewImageFromURI(imageURL)
+	image.FillMode = canvas.ImageFillOriginal
+	*subObjects = append(*subObjects, image)
 }
 
 func (l leftAlignLayout) MinSize(objects []fyne.CanvasObject) fyne.Size {

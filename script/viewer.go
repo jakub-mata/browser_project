@@ -3,8 +3,17 @@ package main
 import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
+	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 )
+
+type ImageFetch struct {
+	url             fyne.URI
+	parentContainer *fyne.Container
+	placeholder     *canvas.Rectangle
+}
+
+var imagesToFetch []ImageFetch
 
 func CreateViewer(root *TreeRoot) {
 	viewerApp := app.New()
@@ -17,9 +26,8 @@ func CreateViewer(root *TreeRoot) {
 	window := viewerApp.NewWindow(PAGE_TITLE)
 	window.Resize(fyne.NewSize(800, 800))
 	window.SetContent(container.NewScroll(mainContainer))
-
-	window.Show()
-	viewerApp.Run()
+	refreshImages()
+	window.ShowAndRun()
 }
 
 func (root *TreeVertex) traverseParsingTree() (*fyne.Container, bool) {
@@ -37,4 +45,13 @@ func (root *TreeVertex) traverseParsingTree() (*fyne.Container, bool) {
 
 	baseContainer := container.NewVBox(subObjects...)
 	return baseContainer, true
+}
+
+func refreshImages() {
+	for _, image := range imagesToFetch {
+		fetched := canvas.NewImageFromURI(image.url)
+		fetched.FillMode = canvas.ImageFillOriginal
+		image.parentContainer.Objects = []fyne.CanvasObject{fetched}
+		image.parentContainer.Refresh()
+	}
 }
