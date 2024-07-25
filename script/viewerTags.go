@@ -117,15 +117,27 @@ func containerFactory(element *TreeVertex) (fyne.CanvasObject, bool) {
 		case "img":
 			imageURL, err := getURL(&element.Token)
 			if err != nil {
-				break
+				img := ImageFetch{
+					errored: true,
+				}
+				imagesToFetch = append(imagesToFetch, img)
+				alt, ok := element.Token.FindAttribute("alt")
+				if !ok {
+					alt = "Image failed to load"
+				}
+				w := widget.NewLabel(alt)
+				subObjects = append(subObjects, w)
+			} else {
+
+				square := canvas.NewRectangle(BORDER_COLOR)
+				subObjects = append(subObjects, square)
+				img := ImageFetch{
+					url:         imageURL,
+					placeholder: square,
+					errored:     false,
+				}
+				imagesToFetch = append(imagesToFetch, img)
 			}
-			square := canvas.NewRectangle(BORDER_COLOR)
-			subObjects = append(subObjects, square)
-			img := ImageFetch{
-				url:         imageURL,
-				placeholder: square,
-			}
-			imagesToFetch = append(imagesToFetch, img)
 
 		case "br":
 			newline := canvas.NewText("\n", TEXT_COLOR)
@@ -187,6 +199,15 @@ func getURL(imageToken *HTMLToken) (fyne.URI, error) {
 		}
 	}
 	panic("No url available")
+}
+
+func (token *HTMLToken) FindAttribute(attrName string) (string, bool) {
+	for _, attribute := range token.Attributes {
+		if attribute.Name == attrName {
+			return attribute.Value, true
+		}
+	}
+	return "", false
 }
 
 func getFontSize(name string) float32 {

@@ -11,6 +11,7 @@ type ImageFetch struct {
 	url             fyne.URI
 	parentContainer *fyne.Container
 	placeholder     *canvas.Rectangle
+	errored         bool
 }
 
 var imagesToFetch []ImageFetch
@@ -49,6 +50,9 @@ func (root *TreeVertex) traverseParsingTree() (*fyne.Container, bool) {
 
 func refreshImages() {
 	for _, image := range imagesToFetch {
+		if image.errored {
+			continue
+		}
 		fetched := canvas.NewImageFromURI(image.url)
 		fetched.FillMode = canvas.ImageFillOriginal
 		image.parentContainer.Objects = []fyne.CanvasObject{fetched}
