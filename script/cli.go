@@ -5,11 +5,11 @@ import (
 	"fmt"
 )
 
-var defaultSite string = "http://0.0.0.0:8063/"
+var defaultSite string = "https://www.google.com/"
 
 func startCLI() (bool, bool, string) {
 	logTokensBool := flag.Bool("log-tokens", false, "Logs tokenizer's output")
-	logParserBool := flag.Bool("log-parser", false, "Logs constructed parsing tree")
+	logParserBool := flag.Bool("log-parser", true, "Logs constructed parsing tree")
 	websiteToFetch := flag.String("address", defaultSite, "The web address to search")
 	flag.Parse()
 	fmt.Println("tokens:", *logTokensBool)

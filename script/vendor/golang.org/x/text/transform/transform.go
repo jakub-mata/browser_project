@@ -127,6 +127,11 @@ type Reader struct {
 	transformComplete bool
 }
 
+// Close implements io.ReadCloser.
+func (r *Reader) Close() error {
+	panic("unimplemented")
+}
+
 const defaultBufSize = 4096
 
 // NewReader returns a new Reader that wraps r by transforming the bytes read
