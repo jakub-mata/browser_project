@@ -4,7 +4,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
+
+	"golang.org/x/text/encoding/charmap"
+	"golang.org/x/text/transform"
 )
 
 func httpClient(url string) ([]byte, error) {
@@ -18,9 +22,23 @@ func httpClient(url string) ([]byte, error) {
 	}
 	defer resp.Body.Close()
 
-	bodyBytes, err := io.ReadAll(resp.Body)
+	bodyBytes, err := checkEncoding(resp)
+
 	if err != nil {
 		return bodyBytes, err
 	}
 	return bodyBytes, nil
+}
+
+func checkEncoding(resp *http.Response) ([]byte, error) {
+	contentType := resp.Header.Get("Content-Type")
+	fmt.Println("Content-type:", contentType)
+
+	body := resp.Body
+	if strings.Contains(contentType, "charset=ISO-8859-1") {
+		body = transform.NewReader(body, charmap.ISO8859_1.NewDecoder())
+	}
+
+	bodyBytes, err := io.ReadAll(body)
+	return bodyBytes, err
 }
