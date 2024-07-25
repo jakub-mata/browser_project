@@ -191,11 +191,28 @@ func (token *HTMLToken) findHref() (*url.URL, error) {
 func getURL(imageToken *HTMLToken) (fyne.URI, error) {
 	for _, attribute := range imageToken.Attributes {
 		if attribute.Name == "src" {
-			source, err := storage.ParseURI(attribute.Value)
+			source, err := url.Parse(attribute.Value)
 			if err != nil {
-				return source, err
+				return nil, err
 			}
-			return source, nil
+
+			var fullURL *url.URL
+			if source.Scheme == "" {
+				base, err := url.Parse(baseAddress)
+				if err != nil {
+					return nil, err
+				}
+				fullURL = base.ResolveReference(source)
+			} else {
+				fullURL = source
+			}
+
+			uri, err := storage.ParseURI(fullURL.String())
+			if err != nil {
+				return nil, err
+			}
+
+			return uri, nil
 		}
 	}
 	panic("No url available")
