@@ -148,7 +148,7 @@ func containerFactory(element *TreeVertex) (fyne.CanvasObject, bool) {
 	//returning
 	layoutType, ok := boxTypes[element.Token.Name]
 	if !ok {
-		base := container.NewVBox(subObjects...)
+		base := container.NewHBox(subObjects...)
 		return base, true
 	}
 
