@@ -25,12 +25,20 @@ func (tokenizer HTMLTokenizer) TokenizeHTML(printTokens bool) []HTMLToken {
 
 	for tokenizer.curr < len(tokenizer.input) {
 		currVal := tokenizer.input[tokenizer.curr]
+		/*
+			fmt.Printf(string(currVal))
+			if tokenizer.curr%20 == 0 {
+				fmt.Printf("")
+			}
+		*/
 		switch tokenizer.state {
 		case Data:
 			switch currVal {
-			case ampersand:
-				tokenizer.state = CharacterReference
-				tokenizer.returnState = append(tokenizer.returnState, Data)
+			/*
+				case ampersand:
+					tokenizer.state = CharacterReference
+					tokenizer.returnState = append(tokenizer.returnState, Data)
+			*/
 			case lesserThan:
 				if isNotWhitespace(tokenizer.currToken.Content.String()) {
 					tokenizer.currToken.Type = Character
@@ -53,9 +61,11 @@ func (tokenizer HTMLTokenizer) TokenizeHTML(printTokens bool) []HTMLToken {
 
 		case RCDATA:
 			switch currVal {
-			case ampersand:
-				tokenizer.state = CharacterReference
-				tokenizer.returnState = append(tokenizer.returnState, RCDATA)
+			/*
+				case ampersand:
+					tokenizer.state = CharacterReference
+					tokenizer.returnState = append(tokenizer.returnState, RCDATA)
+			*/
 			case lesserThan:
 				tokenizer.state = RCDATALessThanSign
 			case null:
@@ -702,9 +712,11 @@ func (tokenizer HTMLTokenizer) TokenizeHTML(printTokens bool) []HTMLToken {
 			switch currVal {
 			case quoteMark: //'"'
 				tokenizer.state = AfterAttributeValueQuoted
-			case ampersand: //'&'
-				tokenizer.returnState = append(tokenizer.returnState, AttributeValueDoubleQuoted)
-				tokenizer.state = CharacterReference
+			/*
+				case ampersand: //'&'
+					tokenizer.returnState = append(tokenizer.returnState, AttributeValueDoubleQuoted)
+					tokenizer.state = CharacterReference
+			*/
 			case null:
 				//Parse error
 				idx := len(tokenizer.currToken.Attributes) - 1
@@ -722,9 +734,11 @@ func (tokenizer HTMLTokenizer) TokenizeHTML(printTokens bool) []HTMLToken {
 			switch currVal {
 			case apostrophe: //'
 				tokenizer.state = AfterAttributeValueQuoted
-			case ampersand: //	"&"
+			/*
+				case ampersand: //	"&"
 				tokenizer.returnState = append(tokenizer.returnState, AttributeValueSingleQuoted)
 				tokenizer.state = CharacterReference
+			*/
 			case null: //null
 				//Parse error
 				idx := len(tokenizer.currToken.Attributes) - 1
@@ -742,9 +756,11 @@ func (tokenizer HTMLTokenizer) TokenizeHTML(printTokens bool) []HTMLToken {
 			switch currVal {
 			case tab, LF, FF, space: //whitespace
 				tokenizer.state = BeforeAttributeName
-			case ampersand:
-				tokenizer.returnState = append(tokenizer.returnState, AttributeValueUnquoted)
-				tokenizer.state = CharacterReference
+			/*
+				case ampersand:
+					tokenizer.returnState = append(tokenizer.returnState, AttributeValueUnquoted)
+					tokenizer.state = CharacterReference
+			*/
 			case greaterThan:
 				tokenizer.state = Data
 				emitCurrToken(&tokenizer.currToken, &tokens)
@@ -863,6 +879,25 @@ func (tokenizer HTMLTokenizer) TokenizeHTML(printTokens bool) []HTMLToken {
 				reconsume(&tokenizer.state, Comment, &tokenizer.curr)
 			}
 
+		case Comment:
+			switch currVal {
+			case lesserThan:
+				tokenizer.currToken.Content.WriteByte(currVal)
+				tokenizer.state = CommentLessThanSign
+			case dash:
+				tokenizer.state = CommentEndDash
+			case null:
+				//parse error
+				tokenizer.currToken.Content.WriteString(replacementChar)
+			case endOfFile:
+				emitCurrToken(&tokenizer.currToken, &tokens)
+				emitToken(HTMLToken{
+					Type: EOF,
+				}, &tokens)
+			default:
+				tokenizer.currToken.Content.WriteByte(currVal)
+			}
+
 		case CommentLessThanSign:
 			switch currVal {
 			case exclamationMark:
@@ -937,7 +972,6 @@ func (tokenizer HTMLTokenizer) TokenizeHTML(printTokens bool) []HTMLToken {
 			case dash:
 				tokenizer.currToken.Content.WriteByte(dash)
 				tokenizer.currToken.Content.WriteByte(dash)
-				tokenizer.currToken.Content.WriteByte(exclamationMark)
 				tokenizer.state = CommentEndDash
 			case greaterThan:
 				//Incorrectly closed comment parse error
@@ -1399,34 +1433,36 @@ func (tokenizer HTMLTokenizer) TokenizeHTML(printTokens bool) []HTMLToken {
 				emitToken(rightBracket, &tokens)
 				reconsume(&tokenizer.state, CDATASection, &tokenizer.curr)
 			}
+		/*
 
-		case CharacterReference:
-			tokenizer.tmpBuffer.Reset()
-			tokenizer.tmpBuffer.WriteByte(ampersand)
-			if isASCIIAlphanumeric(currVal) {
-				reconsume(&tokenizer.state, NamedCharacterReference, &tokenizer.curr)
-			} else if currVal == numberSign {
-				tokenizer.tmpBuffer.WriteByte(currVal)
-				tokenizer.state = NumericCharacterReference
-			} else {
-				prev := popState(&tokenizer.returnState)
-				flushCodePoints(&tokenizer.currToken, prev, tokenizer.tmpBuffer.String(), &tokens)
+			case CharacterReference:
 				tokenizer.tmpBuffer.Reset()
-				reconsume(&tokenizer.state, prev, &tokenizer.curr)
-			}
+				tokenizer.tmpBuffer.WriteByte(ampersand)
+				if isASCIIAlphanumeric(currVal) {
+					reconsume(&tokenizer.state, NamedCharacterReference, &tokenizer.curr)
+				} else if currVal == numberSign {
+					tokenizer.tmpBuffer.WriteByte(currVal)
+					tokenizer.state = NumericCharacterReference
+				} else {
+					prev := popState(&tokenizer.returnState)
+					flushCodePoints(&tokenizer.currToken, prev, tokenizer.tmpBuffer.String(), &tokens)
+					tokenizer.tmpBuffer.Reset()
+					reconsume(&tokenizer.state, prev, &tokenizer.curr)
+				}
 
-		case NamedCharacterReference:
-			for isASCIIAlpha(currVal) {
-				tokenizer.tmpBuffer.WriteByte(currVal)
-				tokenizer.curr++
-				currVal = tokenizer.input[tokenizer.curr]
-			}
-			tokenizer.curr--
+			case NamedCharacterReference:
+				for isASCIIAlpha(currVal) {
+					tokenizer.tmpBuffer.WriteByte(currVal)
+					tokenizer.curr++
+					currVal = tokenizer.input[tokenizer.curr]
+				}
+				tokenizer.curr--
 
-		case AmbiguousAmpersand:
-			if isASCIIAlphanumeric(currVal) {
-				fmt.Println("Not here yet")
-			}
+			case AmbiguousAmpersand:
+				if isASCIIAlphanumeric(currVal) {
+					fmt.Println("Not here yet")
+				}
+		*/
 
 		default:
 			fmt.Println("Not here yet")

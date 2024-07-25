@@ -1,21 +1,22 @@
 package main
 
-var printTokens bool = false
-var printParser bool = false
+import "os"
 
 func main() {
-	body, err := httpClient("http://0.0.0.0:8080/")
+	logTokens, logParser, website := startCLI()
+	body, err := httpClient(website) //run python3 http.server 8080
 	if err != nil {
 		panic(err)
 	}
-
+	//tokenizer
 	tokenizer := NewHTMLTokenizer(body)
-	tokenOutput := tokenizer.TokenizeHTML(printTokens)
-
-	root, err := buildParseTree(tokenOutput, printParser)
+	tokenOutput := tokenizer.TokenizeHTML(logTokens)
+	//parser
+	root, err := buildParseTree(tokenOutput, logParser)
 	if err != nil {
 		panic(err)
 	}
-
+	//viewer
+	os.Setenv("FYNE_THEME", "light")
 	CreateViewer(root)
 }
