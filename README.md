@@ -16,18 +16,35 @@ The program should run on all platforms supported by [Fyne.io](https://fyne.io/)
 
 ## Installation
 
+First, clone the project from [GitHub](https://github.com/jakub-mata/browser_project):
+```
+git clone https://github.com/jakub-mata/browser_project.git
+```
+or [GitLab](https://gitlab.mff.cuni.cz/teaching/nprg031/2324-summer/student-mataj):
+```
+git clone https://gitlab.mff.cuni.cz/teaching/nprg031/2324-summer/student-mataj.git
+```
+Next, change to the directory where you cloned the projrect and run:
+```
+make
+```
+to install dependecies and build the project (you can view this in the *Makefile*). After this step, you should be ready to run the application.
+
 ## Usage
 You can view a webpage by using this command:
 ```
 dora -web *websiteAddress*
 ```
-The address has to be precise. There are two additional flags you can use for debugging.
+The address has to be precise. If nothing is passed, the default address is *https://www.google.com/*. There are two additional flags you can use for debugging.
 
 `-log-tokens` prints out the result of the tokenization stage to the terminal
 
 `-log-parser` prints out the result of the parsing and tree construction stage
 
 After you call the main command, a new window will pop up and display the desired web page.
+
+### Demo
+The project includes an *index.html* file, which contains all the elements currently supported. You can start up a server (e.g. with `python3 -m http.server 8080`) and pass the loopback address to the `-web` flag (in our python's server case *http://127.0.0.1:8080/*)
 
 ## Developer information
 Based on the provided web address, a client sends a get request. The web client is created from Go's standard library.
@@ -48,3 +65,9 @@ The parser gets a slice of HTML Tokens from the tokenizer and creates a parse tr
 Finally, an HTML viewer will render our page when given a root of the parsing tree. It is written with [Fyne.io](https://fyne.io/). 
 
 Each node has a container. Before initializing this container, each node receives (recursively) objects from its children which should be contained within the container. After the recursion ends (and our root has its container filled), the page is showed.
+
+## Known issues
+There are a few issues which need to address in future releases:
+1. *Character references*: currently treated as plain text. For example, the default google web page for Czech uses Latin1 encoding with some characters (e.g. "ř") represented with their character reference code.
+2. *Encodings*: only utf-8 and Latin1 are currently supported
+3. *Long text*: due to limitations of the [Fyne.io](https://fyne.io/) library, there isn't an easy way to wrap text horizontally. As of now, a long text would expand beyond the page.
