@@ -1,6 +1,7 @@
 package main
 
 import (
+	"slices"
 	"strings"
 	"unicode"
 )
@@ -32,7 +33,6 @@ func isASCIIAlpha(s byte) bool {
 	return isUppercase(s) || isLowercase(s)
 }
 
-/*
 func isASCIINumeric(s byte) bool {
 	return (s >= 0x030) && (s <= 0x39)
 }
@@ -40,7 +40,6 @@ func isASCIINumeric(s byte) bool {
 func isASCIIAlphanumeric(s byte) bool {
 	return isASCIIAlpha(s) || isASCIINumeric(s)
 }
-*/
 
 func isUppercase(s byte) bool {
 	if s >= 65 && s <= 90 {
@@ -125,31 +124,30 @@ func nameInDoctype(token *HTMLTokenizer, pointer int, id bool) bool {
 	return true
 }
 
-/*
-	func popState(returnState *[]State) State {
-		popped := (*returnState)[len(*returnState)-1]
-		*returnState = (*returnState)[:len(*returnState)-1]
-		return popped
-	}
+func popState(returnState *[]State) State {
+	popped := (*returnState)[len(*returnState)-1]
+	*returnState = (*returnState)[:len(*returnState)-1]
+	return popped
+}
 
-	func flushCodePoints(currToken *HTMLToken, returnState State, tmpBuffer string, tokens *[]HTMLToken) {
-		asAnAttribute := []State{
-			AttributeValueDoubleQuoted,
-			AttributeValueSingleQuoted,
-			AttributeValueUnquoted,
-		}
-		if slices.Contains(asAnAttribute, returnState) {
-			currToken.Attributes[len(currToken.Attributes)-1].Value = tmpBuffer
-		} else {
-			var content strings.Builder
-			content.WriteString(tmpBuffer)
-			emitToken(HTMLToken{
-				Type:    Character,
-				Content: content,
-			}, tokens)
-		}
+func flushCodePoints(currToken *HTMLToken, returnState State, tmpBuffer string, tokens *[]HTMLToken) {
+	asAnAttribute := []State{
+		AttributeValueDoubleQuoted,
+		AttributeValueSingleQuoted,
+		AttributeValueUnquoted,
 	}
-*/
+	if slices.Contains(asAnAttribute, returnState) {
+		currToken.Attributes[len(currToken.Attributes)-1].Value = tmpBuffer
+	} else {
+		var content strings.Builder
+		content.WriteString(tmpBuffer)
+		emitToken(HTMLToken{
+			Type:    Character,
+			Content: content,
+		}, tokens)
+	}
+}
+
 func isNotWhitespace(sb string) bool {
 	for i := 0; i < len(sb); i++ {
 		if !unicode.IsSpace(rune(sb[i])) {
