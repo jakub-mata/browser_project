@@ -1,4 +1,4 @@
-module browser
+module dora
 
 go 1.22.5
 
