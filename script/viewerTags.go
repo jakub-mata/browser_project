@@ -75,7 +75,8 @@ func containerFactory(element *TreeVertex) (fyne.CanvasObject, bool) {
 			}
 			label := canvas.NewText(element.Token.Content.String(), TEXT_COLOR)
 			label.TextSize = getFontSize(element.Parent.Token.Name)
-			if element.Parent.Token.Name == "strong" {
+			_, isHeader := headerSizes[element.Parent.Token.Name]
+			if (element.Parent.Token.Name == "strong") || (isHeader) {
 				label.TextStyle.Bold = true
 			}
 			if element.Parent.Token.Name == "em" {
