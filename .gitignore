@@ -19,3 +19,8 @@
 
 # Go workspace file
 go.work
+.vscode/
+script/__debug_bin60473771
+script/__debug_bin2991594176
+script/__debug_bin3900857721
+.idea/
