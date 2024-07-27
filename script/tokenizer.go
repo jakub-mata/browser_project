@@ -26,8 +26,8 @@ func (tokenizer HTMLTokenizer) TokenizeHTML(printTokens bool) []HTMLToken {
 	for tokenizer.curr < len(tokenizer.input) {
 		currVal := tokenizer.input[tokenizer.curr]
 		/*
-			fmt.Printf(string(currVal))
-			if tokenizer.curr%20 == 0 {
+			fmt.Print(string(currVal))
+			if tokenizer.curr >= 31240 {
 				fmt.Printf("")
 			}
 		*/
@@ -638,8 +638,7 @@ func (tokenizer HTMLTokenizer) TokenizeHTML(printTokens bool) []HTMLToken {
 
 		case AttributeName:
 			switch currVal {
-			case tab, LF, FF, space, solidus, greaterThan: //whitespace, '/' or '>'
-			case endOfFile:
+			case tab, LF, FF, space, solidus, greaterThan, endOfFile:
 				reconsume(&tokenizer.state, AfterAttributeName, &tokenizer.curr)
 			case equal:
 				tokenizer.state = BeforeAttributeValue
