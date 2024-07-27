@@ -33,9 +33,9 @@ make
 to install dependecies and build the project (you can view this in the *Makefile*). This will take a while. After this step, you should be ready to run the application.
 
 ## Usage
-You can view a webpage by using this command:
+Switch to the script directory. Then can view a webpage by using this command:
 ```
-dora -web *websiteAddress*
+go run dora -web *websiteAddress*
 ```
 The address has to be precise. If nothing is passed, the default address is *https://www.google.com/*. There are two additional flags you can use for debugging.
 
@@ -44,6 +44,8 @@ The address has to be precise. If nothing is passed, the default address is *htt
 `-log-parser` prints out the result of the parsing and tree construction stage
 
 After you call the main command, a new window will pop up and display the desired web page.
+
+> A slight warning: The shown webpages will look off. This is due to the app only supporting HTML (and only a subset of all HTML tags, for that matter).
 
 ### Demo
 The project includes an *index.html* file, which contains all the elements currently supported. You can start up a server (e.g. with `python3 -m http.server 8080`) and pass the loopback address to the `-web` flag (in our python's server case *http://127.0.0.1:8080/*)
