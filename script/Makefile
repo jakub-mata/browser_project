@@ -1,3 +1,3 @@
 build:
 	go mod vendor
-	go build
+	go build -v
