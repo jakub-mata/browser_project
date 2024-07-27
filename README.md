@@ -24,7 +24,9 @@ or [GitLab](https://gitlab.mff.cuni.cz/teaching/nprg031/2324-summer/student-mata
 ```
 git clone https://gitlab.mff.cuni.cz/teaching/nprg031/2324-summer/student-mataj.git
 ```
-Next, change to the directory where you cloned the projrect and run:
+You will also need to install Go if you haven't done so yet. The project was built with Go 1.21 and 1.22, but any newest stable version should work fine. You can follow these [instructions](https://go.dev/dl/).
+
+Next, change to the directory where you cloned the projrect, go to the script directory and run:
 ```
 make
 ```
