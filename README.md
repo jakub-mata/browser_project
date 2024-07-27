@@ -50,6 +50,16 @@ After you call the main command, a new window will pop up and display the desire
 ### Demo
 The project includes an *index.html* file, which contains all the elements currently supported. You can start up a server (e.g. with `python3 -m http.server 8080`) and pass the loopback address to the `-web` flag (in our python's server case *http://127.0.0.1:8080/*)
 
+### Recommended websites
+These websites are purely HTML and should mostly looks as intended:
+- http://motherfuckingwebsite.com/
+- https://ukarim.com/ (a software engineer's personal page)
+- https://wittallen.net/ (the same thing)
+Most common sites rely on dynamic rendering with Javascript, but you can still try to view them in their pure HTML form:
+- https://www.google.com/ (might throw errors if they have a special day animation)
+- https://www.wikipedia.org/
+
+
 ## Developer information
 Based on the provided web address, a client sends a get request. The web client is created from Go's standard library.
 
