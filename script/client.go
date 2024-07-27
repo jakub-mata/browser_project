@@ -34,7 +34,7 @@ func checkEncoding(resp *http.Response) ([]byte, error) {
 	contentType := resp.Header.Get("Content-Type")
 	fmt.Println("Content-type:", contentType)
 
-	body := resp.Body
+	body := (resp.Body).(io.Reader)
 	if strings.Contains(contentType, "charset=ISO-8859-1") {
 		body = transform.NewReader(body, charmap.ISO8859_1.NewDecoder())
 	}
