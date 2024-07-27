@@ -33,7 +33,7 @@ make
 to install dependecies and build the project (you can view this in the *Makefile*). This will take a while. After this step, you should be ready to run the application.
 
 ## Usage
-Switch to the script directory. Then can view a webpage by using this command:
+Switch to the script directory inside the cloned repo. Then can view a webpage by using this command:
 ```
 go run dora -web *websiteAddress*
 ```
