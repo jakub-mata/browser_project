@@ -1,6 +1,9 @@
 package main
 
-import "os"
+import (
+	"fmt"
+	"os"
+)
 
 var baseAddress string
 
@@ -9,7 +12,9 @@ func main() {
 	baseAddress = website
 	body, err := httpClient(website) //run python3 http.server 8080
 	if err != nil {
-		panic(err)
+		fmt.Println("error during the client phase")
+		fmt.Println(err)
+		return
 	}
 	//tokenizer
 	tokenizer := NewHTMLTokenizer(body)
