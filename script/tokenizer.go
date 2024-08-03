@@ -7,6 +7,8 @@ import (
 
 const endOfFile byte = byte(1)
 
+var selfClosingTrieRoot = createSelfClosingTrie()
+
 type HTMLTokenizer struct {
 	input            []byte
 	curr             int
@@ -25,12 +27,12 @@ func (tokenizer HTMLTokenizer) TokenizeHTML(printTokens bool) []HTMLToken {
 
 	for tokenizer.curr < len(tokenizer.input) {
 		currVal := tokenizer.input[tokenizer.curr]
-		/*
-			fmt.Print(string(currVal))
-			if tokenizer.curr >= 31240 {
-				fmt.Printf("")
-			}
-		*/
+
+		fmt.Print(string(currVal))
+		if tokenizer.curr >= 2882 {
+			fmt.Printf("")
+		}
+
 		switch tokenizer.state {
 		case Data:
 			switch currVal {
@@ -210,6 +212,10 @@ func (tokenizer HTMLTokenizer) TokenizeHTML(printTokens bool) []HTMLToken {
 			case tab, LF, FF, space:
 				tokenizer.state = BeforeAttributeName
 			case greaterThan:
+				if selfClosingWithoutSolidus(&tokenizer) {
+					reconsume(&tokenizer.state, SelfClosingStartTag, &tokenizer.curr)
+					break
+				}
 				tokenizer.state = Data
 				emitCurrToken(&tokenizer.currToken, &tokens)
 				if tokenizer.currToken.Type == StartTag {

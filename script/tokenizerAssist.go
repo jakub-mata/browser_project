@@ -1,7 +1,6 @@
 package main
 
 import (
-	"slices"
 	"strings"
 	"unicode"
 )
@@ -33,6 +32,7 @@ func isASCIIAlpha(s byte) bool {
 	return isUppercase(s) || isLowercase(s)
 }
 
+/*
 func isASCIINumeric(s byte) bool {
 	return (s >= 0x030) && (s <= 0x39)
 }
@@ -40,6 +40,7 @@ func isASCIINumeric(s byte) bool {
 func isASCIIAlphanumeric(s byte) bool {
 	return isASCIIAlpha(s) || isASCIINumeric(s)
 }
+*/
 
 func isUppercase(s byte) bool {
 	if s >= 65 && s <= 90 {
@@ -124,30 +125,31 @@ func nameInDoctype(token *HTMLTokenizer, pointer int, id bool) bool {
 	return true
 }
 
-func popState(returnState *[]State) State {
-	popped := (*returnState)[len(*returnState)-1]
-	*returnState = (*returnState)[:len(*returnState)-1]
-	return popped
-}
-
-func flushCodePoints(currToken *HTMLToken, returnState State, tmpBuffer string, tokens *[]HTMLToken) {
-	asAnAttribute := []State{
-		AttributeValueDoubleQuoted,
-		AttributeValueSingleQuoted,
-		AttributeValueUnquoted,
+/*
+	func popState(returnState *[]State) State {
+		popped := (*returnState)[len(*returnState)-1]
+		*returnState = (*returnState)[:len(*returnState)-1]
+		return popped
 	}
-	if slices.Contains(asAnAttribute, returnState) {
-		currToken.Attributes[len(currToken.Attributes)-1].Value = tmpBuffer
-	} else {
-		var content strings.Builder
-		content.WriteString(tmpBuffer)
-		emitToken(HTMLToken{
-			Type:    Character,
-			Content: content,
-		}, tokens)
-	}
-}
 
+	func flushCodePoints(currToken *HTMLToken, returnState State, tmpBuffer string, tokens *[]HTMLToken) {
+		asAnAttribute := []State{
+			AttributeValueDoubleQuoted,
+			AttributeValueSingleQuoted,
+			AttributeValueUnquoted,
+		}
+		if slices.Contains(asAnAttribute, returnState) {
+			currToken.Attributes[len(currToken.Attributes)-1].Value = tmpBuffer
+		} else {
+			var content strings.Builder
+			content.WriteString(tmpBuffer)
+			emitToken(HTMLToken{
+				Type:    Character,
+				Content: content,
+			}, tokens)
+		}
+	}
+*/
 func isNotWhitespace(sb string) bool {
 	for i := 0; i < len(sb); i++ {
 		if !unicode.IsSpace(rune(sb[i])) {
@@ -161,4 +163,54 @@ func toBuilder(char string) strings.Builder {
 	var sb strings.Builder
 	sb.WriteString(char)
 	return sb
+}
+
+func createSelfClosingTrie() TrieRoot {
+	selfClosingTrieRoot := TrieVertex{Value: "", Children: []*TrieVertex{
+		{Value: "r", Children: []*TrieVertex{
+			{Value: "h", Children: []*TrieVertex{
+				{Value: ""},
+			}},
+			{Value: "b", Children: []*TrieVertex{
+				{Value: ""},
+			}},
+		}}}}
+	return TrieRoot{Root: &selfClosingTrieRoot}
+}
+
+func selfClosingWithoutSolidus(tokenizer *HTMLTokenizer) bool {
+	curr := selfClosingTrieRoot
+	for _, child := range curr.Root.Children {
+		match := traverseTrie(child, tokenizer, 1)
+		if match {
+			return match
+		}
+	}
+	return false
+}
+
+func traverseTrie(vertex *TrieVertex, tokenizer *HTMLTokenizer, level int) bool {
+	if vertex.Value == "" {
+		return true
+	}
+	if vertex.Value != string(tokenizer.input[tokenizer.curr-level]) {
+		return false
+	} else {
+		for _, child := range vertex.Children {
+			match := traverseTrie(child, tokenizer, level+1)
+			if match {
+				return true
+			}
+		}
+		return false
+	}
+}
+
+type TrieRoot struct {
+	Root *TrieVertex
+}
+
+type TrieVertex struct {
+	Value    string
+	Children []*TrieVertex
 }
