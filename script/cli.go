@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-var defaultSite string = "https://www.google.com/"
+var defaultSite string = "https://jakub-mata.github.io/"
 
 func startCLI() (bool, bool, string) {
 	logTokensBool := flag.Bool("log-tokens", false, "Logs tokenizer's output")

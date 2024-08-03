@@ -27,12 +27,12 @@ func (tokenizer HTMLTokenizer) TokenizeHTML(printTokens bool) []HTMLToken {
 
 	for tokenizer.curr < len(tokenizer.input) {
 		currVal := tokenizer.input[tokenizer.curr]
-
-		fmt.Print(string(currVal))
-		if tokenizer.curr >= 2882 {
-			fmt.Printf("")
-		}
-
+		/*
+			fmt.Print(string(currVal))
+			if tokenizer.curr >= 2882 {
+				fmt.Printf("")
+			}
+		*/
 		switch tokenizer.state {
 		case Data:
 			switch currVal {

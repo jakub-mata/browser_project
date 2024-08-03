@@ -37,7 +37,7 @@ Switch to the script directory inside the cloned repo. Then can view a webpage b
 ```
 go run dora -web *websiteAddress*
 ```
-The address has to be precise. If nothing is passed, the default address is *https://www.google.com/*. There are two additional flags you can use for debugging.
+The address has to be precise. If nothing is passed, the default address is *https://jakub-mata.github.io/*(see more in Demo). There are two additional flags you can use for debugging.
 
 `-log-tokens` prints out the result of the tokenization stage to the terminal
 
@@ -48,7 +48,7 @@ After you call the main command, a new window will pop up and display the desire
 > A slight warning: The shown webpages will look off. This is due to the app only supporting HTML (and only a subset of all HTML tags, for that matter).
 
 ### Demo
-The project includes an *index.html* file, which contains all the elements currently supported. You can start up a server (e.g. with `python3 -m http.server 8080`) and pass the loopback address to the `-web` flag (in our python's server case *http://127.0.0.1:8080/*)
+The default website is another repo at my [Github](https://github.com/jakub-mata/jakub-mata.github.io), which contains all the elements currently supported. You can view this page in your favorite browser [here](https://jakub-mata.github.io/).
 
 ### Recommended websites
 These websites are purely HTML and should mostly looks as intended:

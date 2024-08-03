@@ -103,6 +103,7 @@ func containerFactory(element *TreeVertex) (fyne.CanvasObject, bool) {
 				break
 			}
 			hyperLink := widget.NewHyperlink(element.Token.Content.String(), linkValue)
+
 			subObjects = append(subObjects, hyperLink)
 		case "title":
 			PAGE_TITLE = element.Token.Content.String()
