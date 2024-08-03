@@ -22,7 +22,9 @@ func main() {
 	//parser
 	root, err := buildParseTree(tokenOutput, logParser)
 	if err != nil {
-		panic(err)
+		fmt.Println("error during tree construction phase")
+		fmt.Println(err)
+		return
 	}
 	//viewer
 	os.Setenv("FYNE_THEME", "light")
