@@ -154,7 +154,7 @@ func containerFactory(element *TreeVertex) (fyne.CanvasObject, bool) {
 	for _, child := range element.Children {
 		subContainer, ok := containerFactory(child)
 		if !ok {
-			return container.NewWithoutLayout(), false
+			return nil, false
 		}
 		subObjects = append(subObjects, subContainer)
 	}

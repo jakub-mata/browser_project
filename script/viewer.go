@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/canvas"
@@ -21,7 +23,8 @@ func CreateViewer(root *TreeRoot) {
 	mainContainer, ok := root.Root.traverseParsingTree()
 
 	if !ok {
-		panic("no content")
+		fmt.Println("There is no content to be displayed")
+		return
 	}
 
 	window := viewerApp.NewWindow(PAGE_TITLE)
