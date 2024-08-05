@@ -13,7 +13,7 @@ import (
 
 func httpClient(url string) ([]byte, error) {
 
-	client := http.Client{Timeout: time.Duration(1) * time.Second} //add cookies
+	client := http.Client{Timeout: time.Duration(3) * time.Second} //add cookies
 	resp, err := client.Get(url)
 	if err != nil {
 		fmt.Println("Error during http request")
