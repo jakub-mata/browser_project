@@ -37,7 +37,7 @@ Switch to the script directory inside the cloned repo. Then can view a webpage b
 ```
 go run dora -web *websiteAddress*
 ```
-The address has to be precise. If nothing is passed, the default address is *https://jakub-mata.github.io/*(see more in Demo). There are two additional flags you can use for debugging.
+The address has to be precise. If nothing is passed, the default address is *https://jakub-mata.github.io/* (see more in Demo). There are two additional flags you can use for debugging.
 
 `-log-tokens` prints out the result of the tokenization stage to the terminal
 
@@ -55,9 +55,11 @@ These websites are purely HTML and should mostly looks as intended:
 - http://motherfuckingwebsite.com/
 - https://ukarim.com/ (a software engineer's personal page)
 - https://wittallen.net/ (the same thing)
+
 Most common sites rely on dynamic rendering with Javascript, but you can still try to view them in their pure HTML form:
 - https://www.google.com/ (might throw errors if they have a special day animation)
 - https://www.wikipedia.org/
+- https://viethung.space/blog/2020/10/24/Browser-from-Scratch-HTML-parsing/ (a source used for this project)
 
 
 ## Developer information
@@ -85,3 +87,4 @@ There are a few issues which need to address in future releases:
 1. *Character references*: currently treated as plain text. For example, the default google web page for Czech uses Latin1 encoding with some characters (e.g. "ř") represented with their character reference code.
 2. *Encodings*: only utf-8 and Latin1 are currently supported
 3. *Long text*: due to limitations of the [Fyne.io](https://fyne.io/) library, there isn't an easy way to wrap text horizontally. As of now, a long text would expand beyond the page.
+4. *Text within text*: Tags like `<strong>` or `<a>` can be found inside a text (like a `<p>` tag). Contents of these tags will have an unwanted padding, which separates them from the surrounding text. This is a default behavior of containers in [Fyne.io](https://fyne.io/), which is difficult to overwrite.
