@@ -33,11 +33,11 @@ make
 to install dependecies and build the project (you can view this in the *Makefile*). This will take a while (seriously, some of the dependencies are written in C and its compiler is slower at times; you can expect several minutes at most). After this step, you should be ready to run the application.
 
 ## Usage
-Switch to the script directory inside the cloned repo. Then can view a webpage by using this command:
+Switch to the script directory inside the cloned repo. Then you can view a webpage by using this command:
 ```
 go run dora -web *websiteAddress*
 ```
-The address has to be precise. If nothing is passed, the default address is *https://jakub-mata.github.io/* (see more in Demo). There are two additional flags you can use for debugging.
+The address has to be precise. If no `-web` flag is passed (you run `go run dora`), the default address is *https://jakub-mata.github.io/* (see more in Demo). There are two additional flags you can use for debugging.
 
 `-log-tokens` prints out the result of the tokenization stage to the terminal
 
@@ -51,7 +51,7 @@ After you call the main command, a new window will pop up and display the desire
 The default website is another repo at my [Github](https://github.com/jakub-mata/jakub-mata.github.io), which contains all the elements currently supported. You can view this page in your favorite browser [here](https://jakub-mata.github.io/).
 
 ### Recommended websites
-These websites are purely HTML and should mostly looks as intended:
+These websites are purely HTML and should mostly look as intended:
 - http://motherfuckingwebsite.com/
 - https://ukarim.com/ (a software engineer's personal page)
 - https://wittallen.net/ (the same thing)
