@@ -30,7 +30,7 @@ Next, change to the directory where you cloned the projrect and go to the script
 ```
 make
 ```
-to install dependecies and build the project (you can view this in the *Makefile*). This will take a while. After this step, you should be ready to run the application.
+to install dependecies and build the project (you can view this in the *Makefile*). This will take a while (seriously, some of the dependencies are written in C and its compiler is slower at times; you can expect several minutes at most). After this step, you should be ready to run the application.
 
 ## Usage
 Switch to the script directory inside the cloned repo. Then can view a webpage by using this command:
