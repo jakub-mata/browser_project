@@ -21,8 +21,8 @@ func createRoot(rootToken HTMLToken) TreeRoot {
 func findComplementaryOpenTag(node *TreeVertex, name string) (*TreeVertex, error) {
 	prevNode := node
 	for prevNode.Token.Name != name {
-		if prevNode == nil {
-			return nil, fmt.Errorf("no complimentary tag found")
+		if prevNode.Parent == nil {
+			return nil, fmt.Errorf("no complimentary tag found for %s", node.Token)
 		}
 		prevNode = prevNode.Parent
 	}
