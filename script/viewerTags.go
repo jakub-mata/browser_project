@@ -40,15 +40,15 @@ var headerSizes = map[string]float32{
 }
 
 var boxTypes = map[string]fyne.Layout{
-	"h1":     layout.NewHBoxLayout(),
-	"h2":     layout.NewHBoxLayout(),
-	"h3":     layout.NewHBoxLayout(),
-	"h4":     layout.NewHBoxLayout(),
-	"h5":     layout.NewHBoxLayout(),
-	"h6":     layout.NewHBoxLayout(),
+	"h1":     &TextLayout{},
+	"h2":     &TextLayout{},
+	"h3":     &TextLayout{},
+	"h4":     &TextLayout{},
+	"h5":     &TextLayout{},
+	"h6":     &TextLayout{},
 	"p":      &TextLayout{}, //layout.NewHBoxLayout(),
-	"li":     layout.NewHBoxLayout(),
-	"a":      layout.NewHBoxLayout(),
+	"li":     &TextLayout{},
+	"a":      &TextLayout{},
 	"img":    leftAlignLayout{},
 	"div":    layout.NewVBoxLayout(),
 	"span":   layout.NewVBoxLayout(),
