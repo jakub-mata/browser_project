@@ -46,7 +46,7 @@ var boxTypes = map[string]fyne.Layout{
 	"h4":     layout.NewHBoxLayout(),
 	"h5":     layout.NewHBoxLayout(),
 	"h6":     layout.NewHBoxLayout(),
-	"p":      layout.NewHBoxLayout(),
+	"p":      &TextLayout{}, //layout.NewHBoxLayout(),
 	"li":     layout.NewHBoxLayout(),
 	"a":      layout.NewHBoxLayout(),
 	"img":    leftAlignLayout{},
@@ -260,4 +260,29 @@ func (l leftAlignLayout) Layout(objects []fyne.CanvasObject, containerSize fyne.
 
 func (l leftAlignLayout) ApplyLayout(objects []fyne.CanvasObject, containerSize fyne.Size) {
 	l.Layout(objects, containerSize)
+}
+
+type TextLayout struct{}
+
+// Horizontal Layout
+func (l *TextLayout) MinSize(objects []fyne.CanvasObject) fyne.Size {
+	//w, h := float32(0), float32(0)
+	minSize := fyne.NewSize(0, 0)
+	for _, o := range objects {
+		//childSize := o.MinSize()
+		//w += childSize.Width
+		minSize = minSize.Max(o.MinSize())
+	}
+	return minSize
+}
+
+func (l *TextLayout) Layout(objects []fyne.CanvasObject, containerSize fyne.Size) {
+	pos := fyne.NewPos(0, containerSize.Height-l.MinSize(objects).Height)
+	for _, o := range objects {
+		size := o.MinSize()
+		o.Resize(size)
+		o.Move(pos)
+
+		pos = pos.Add(fyne.NewPos(size.Width, 0))
+	}
 }
