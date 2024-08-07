@@ -88,3 +88,4 @@ There are a few issues which need to address in future releases:
 2. *Encodings*: only utf-8 and Latin1 are currently supported
 3. *Long text*: due to limitations of the [Fyne.io](https://fyne.io/) library, there isn't an easy way to wrap text horizontally. As of now, a long text would expand beyond the page.
 4. *Text within text*: Tags like `<strong>` or `<a>` can be found inside a text (like a `<p>` tag). Contents of these tags will have an unwanted padding, which separates them from the surrounding text. This is a default behavior of containers in [Fyne.io](https://fyne.io/), which is difficult to overwrite.
+    > *A fix is currently available in the text-issues branch, soon in the stable (main) branch*
