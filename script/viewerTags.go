@@ -46,7 +46,7 @@ var boxTypes = map[string]fyne.Layout{
 	"h4":     &TextLayout{},
 	"h5":     &TextLayout{},
 	"h6":     &TextLayout{},
-	"p":      &TextLayout{}, //layout.NewHBoxLayout(),
+	"p":      &TextLayout{},
 	"li":     &TextLayout{},
 	"a":      &TextLayout{},
 	"img":    leftAlignLayout{},
@@ -92,8 +92,10 @@ func containerFactory(element *TreeVertex) (fyne.CanvasObject, bool) {
 			case "ul":
 				//circle := canvas.NewCircle(TEXT_COLOR)
 				//circle.StrokeWidth = float32(CIRCLE_LIST_STROKEWIDTH)
-				circle := canvas.NewText("\u2218", TEXT_COLOR)
-				subObjects = append(subObjects, circle, label)
+				//circle := canvas.NewText("\u2218", TEXT_COLOR)
+				circle := "\u2218"
+				label := canvas.NewText(circle+" "+element.Token.Content.String(), TEXT_COLOR)
+				subObjects = append(subObjects, label)
 			default:
 				subObjects = append(subObjects, label)
 			}
@@ -162,7 +164,7 @@ func containerFactory(element *TreeVertex) (fyne.CanvasObject, bool) {
 	//returning
 	layoutType, ok := boxTypes[element.Token.Name]
 	if !ok {
-		base := container.NewHBox(subObjects...)
+		base := container.NewVBox(subObjects...)
 		return base, true
 	}
 
