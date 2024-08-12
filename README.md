@@ -35,9 +35,9 @@ to install dependecies and build the project (you can view this in the *Makefile
 ## Usage
 Switch to the script directory inside the cloned repo. Then you can view a webpage by using this command:
 ```
-go run dora -web *websiteAddress*
+go run dora *websiteAddress*
 ```
-The address has to be precise. If no `-web` flag is passed (you run `go run dora`), the default address is *https://jakub-mata.github.io/* (see more in Demo). There are two additional flags you can use for debugging.
+The address has to be precise. If no positional argument is passed,  (you run `go run dora`), the default address is *https://jakub-mata.github.io/* (see more in Demo). Only the first positional argument will be handled. There are two additional flags you can use for debugging.
 
 `-log-tokens` prints out the result of the tokenization stage to the terminal
 
