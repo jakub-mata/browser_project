@@ -40,15 +40,15 @@ var headerSizes = map[string]float32{
 }
 
 var boxTypes = map[string]fyne.Layout{
-	"h1":     layout.NewHBoxLayout(),
-	"h2":     layout.NewHBoxLayout(),
-	"h3":     layout.NewHBoxLayout(),
-	"h4":     layout.NewHBoxLayout(),
-	"h5":     layout.NewHBoxLayout(),
-	"h6":     layout.NewHBoxLayout(),
-	"p":      layout.NewHBoxLayout(),
-	"li":     layout.NewHBoxLayout(),
-	"a":      layout.NewHBoxLayout(),
+	"h1":     layout.NewVBoxLayout(),
+	"h2":     layout.NewVBoxLayout(),
+	"h3":     layout.NewVBoxLayout(),
+	"h4":     layout.NewVBoxLayout(),
+	"h5":     layout.NewVBoxLayout(),
+	"h6":     layout.NewVBoxLayout(),
+	"p":      layout.NewVBoxLayout(),
+	"li":     layout.NewVBoxLayout(),
+	"a":      layout.NewVBoxLayout(),
 	"img":    leftAlignLayout{},
 	"div":    layout.NewVBoxLayout(),
 	"span":   layout.NewVBoxLayout(),
@@ -92,8 +92,9 @@ func containerFactory(element *TreeVertex) (fyne.CanvasObject, bool) {
 			case "ul":
 				//circle := canvas.NewCircle(TEXT_COLOR)
 				//circle.StrokeWidth = float32(CIRCLE_LIST_STROKEWIDTH)
-				circle := canvas.NewText("\u2218", TEXT_COLOR)
-				subObjects = append(subObjects, circle, label)
+				circle := "\u2218"
+				label = canvas.NewText(circle+" "+element.Token.Content.String(), TEXT_COLOR)
+				subObjects = append(subObjects, label)
 			default:
 				subObjects = append(subObjects, label)
 			}
@@ -162,7 +163,7 @@ func containerFactory(element *TreeVertex) (fyne.CanvasObject, bool) {
 	//returning
 	layoutType, ok := boxTypes[element.Token.Name]
 	if !ok {
-		base := container.NewHBox(subObjects...)
+		base := container.NewVBox(subObjects...)
 		return base, true
 	}
 
