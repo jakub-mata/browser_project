@@ -8,6 +8,7 @@ The browser is basically a simple HTML viewer. As of now, the supported tags inc
 - text-based tags: *p, h1 - h6, a, br, hr*
 - lists: *ul, li*
 - text-style tags: *strong, em*
+- images: *img*
 
 Only essential tag attributes are supported, e.g. *href* for anchor tags. Style tags (used for CSS styling) inside HTML tag elements are not supported.
 
@@ -66,21 +67,34 @@ Most common sites rely on dynamic rendering with Javascript, but you can still t
 Based on the provided web address, a client sends a get request. The web client is created from Go's standard library.
 
 The main program, which handles the response body, is structured into 3 parts:
-1. Tokenizer (tokenizer.go)
+1. Tokenizer (tokenizer.go, tokenizerAssist.go)
 2. Parser / Tree-constructer (treeConstruction.go)
-3. Viewer (viewer.go)
+3. Viewer (viewer.go, viewerTags.go)
 
 ### Tokenizer
-Our tokenizer takes a stream of bytes and creates a slice of HTML Tokens. In theory, the tokenizer should emit tokens inidividually to allow the parser to insert and change the DOM (parsing tree). However, this is not required with HTML alone and so I've allowed myself to make this simplication and return the slice of tokens at once.
-The output of the tokenization stage can be turned on with the `log-tokens` flag
+Our tokenizer takes a stream of bytes and creates a slice of HTML tokens (a struct for HTML Tokens created in HTMLToken.go). In theory, the tokenizer should emit tokens inidividually to allow the parser to insert and change the DOM (parsing tree). However, this is not required with HTML alone and so I've allowed myself to make this simplication and return the slice of tokens at once.
+
+The tokenizer is just a (really large) state machine, which remembers:
+- which byte was last read 
+- current state (all states are listed in HTMLToken.go)
+- current tag which is being constructed
+
+The tokenizer's main method is `TokenizeHTML`. When called from the main function, `TokenizeHTML` goes over the provided input of bytes and returns a slice of tokens. Since our tokenizer is written according official HTML specifications, its inner workings can be read [here](https://html.spec.whatwg.org/multipage/parsing.html#tokenization)
+
+The output of the tokenization stage can be turned on with the `log-tokens` flag.
+
 
 ### Parser
-The parser gets a slice of HTML Tokens from the tokenizer and creates a parse tree. The output of the tree-construction stage can be turned on with the `log-parser` flag.
+The parser gets a slice of HTML Tokens from the tokenizer and creates a parse tree. `buildParseTree()` function goes over provided slice of tokens. When an open tag token is found, a new node is created and appended. When a close tag is found, it returns to its complimentary open tag and continues building from there. If no complimentary tag is found, the program stops and prints a corresponding error.
+
+The output of the tree-construction stage can be turned on with the `log-parser` flag.
 
 ### Viewer
 Finally, an HTML viewer will render our page when given a root of the parsing tree. It is written with [Fyne.io](https://fyne.io/). 
 
-Each node has a container. Before initializing this container, each node receives (recursively) objects from its children which should be contained within the container. After the recursion ends (and our root has its container filled), the page is showed.
+We call `traverseParsingTree()` on this root, which sets up our recursion. Then, on each child, the `containerFactory()` function is called. In this fucntion, each node is given a container. Before initializing this container, each node receives (recursively) objects from its children, which are later inserted into the container. After the recursion ends (and our root has its container filled), the page is showed.
+
+Special attention has to paid to images. Unfortunately, current version of the [Fyne.io](https://fyne.io/) library have instrinsic race conditions, which cannot be undone (to be, fair, this is not normally an issue when creating "normal" web applications). If we try to fetch our image when an image tag is found, the code often panics. To avoid this race condition, we set up a placeholder and note down the image's url and position. When the whole parsing tree is traversed, only then we go over our images, fetch them, and replace their placeholders. You can see this image fetching in `refreshImages()` in *viewer.go*.
 
 ## Known issues
 There are a few issues which need to address in future releases:
